@@ -100,19 +100,20 @@ pub fn adams<T: Clone, S: AdamsSolver>(
           }
           nflag = false;
         }
-        path.push((time + dt_old, corrector.clone()));
+        time += dt_old;
+        path.push((time, corrector.clone()));
         memory.pop_front();
         memory.push_back(implicit);
         considering.pop_front();
-        considering.push_back((time + dt_old, corrector.clone()));
+        considering.push_back((time, corrector.clone()));
         if last {
           break 'out;
         }
         if result == 2 || time + dt_old > t_final {
           let mut dt_old = solver.dt();
-          if time + 4.0*solver.dt() > t_final {
+          if time + 4.0*dt_old > t_final {
             last = true;
-            dt_old = (t_final - time) / (4.0 * solver.dt());
+            dt_old = (t_final - time) / (4.0 * dt_old);
           }
 
           considering.clear();
@@ -142,10 +143,6 @@ pub fn adams<T: Clone, S: AdamsSolver>(
           }
 
           nflag = true;
-
-          time = considering.back().unwrap().0;
-        } else {
-          time += dt_old;
         }
       } else if nflag {
         considering.clear();
