@@ -1,7 +1,9 @@
 use nalgebra::{DVector};
 
 pub mod rk;
+pub mod adams;
 pub use rk::*;
+pub use adams::*;
 
 pub fn euler<T>(
   (t_initial, t_final): (f64, f64),

@@ -56,8 +56,8 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
     let mut new_params = old_params.clone();
     for ind in 0..num_k {
       state = path.last().unwrap().1.clone();
-      for j in 0..ind {
-        state += S::k_coefficients()[ind][j] * &k[j];
+      for (j, k) in k.iter().enumerate() {
+        state += S::k_coefficients()[ind][j] * k;
       }
       k.push(
         derivs(
@@ -81,8 +81,8 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
     let mut error = 0.0;
     if S::adaptive() {
       let mut error_vec = k[0].clone() * S::error_coefficients()[0];
-      for ind in 1..k.len() {
-        error_vec += &k[ind] * S::error_coefficients()[ind];
+      for (ind, k) in k.iter().enumerate().skip(1) {
+        error_vec += k * S::error_coefficients()[ind];
       }
       error = error_vec.norm() / solver.dt();
     }
@@ -110,7 +110,7 @@ pub struct RungeKuttaBuilder {
 }
 
 impl RungeKutta {
-  pub fn new() -> RungeKuttaBuilder {
+  pub fn default() -> RungeKuttaBuilder {
     RungeKuttaBuilder {
       solver: RungeKutta{
         dt: 0.01,
@@ -172,7 +172,7 @@ pub struct RungeKuttaFehlbergBuilder {
 }
 
 impl RungeKuttaFehlberg {
-  pub fn new() -> RungeKuttaFehlbergBuilder {
+  pub fn default() -> RungeKuttaFehlbergBuilder {
     RungeKuttaFehlbergBuilder {
       solver: RungeKuttaFehlberg {
         dt: 0.01,
