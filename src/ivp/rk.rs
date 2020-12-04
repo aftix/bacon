@@ -25,11 +25,6 @@ pub trait RungeKuttaSolver {
     false
   }
 
-  // For adaptive solvers, get the error tolerance
-  fn tolerance(&self) -> f64 {
-    0.0
-  }
-
   // For adaptive solvers, update dt
   // Returns Ok(true) if state should be accepted
   // Returns Ok(false) if state should be rejected
@@ -125,13 +120,14 @@ impl RungeKutta {
 }
 
 impl RungeKuttaBuilder {
-  pub fn build(&self) -> RungeKutta {
-    RungeKutta {
-      dt: self.solver.dt,
-    }
+  pub fn build(self) -> RungeKutta {
+    self.solver
   }
 
   pub fn with_dt(&mut self, dt: f64) -> &mut RungeKuttaBuilder {
+    if dt <= 0.0 {
+      panic!("dt must be positive");
+    }
     self.solver.dt = dt;
     self
   }
@@ -157,5 +153,129 @@ impl RungeKuttaSolver for RungeKutta {
 
   fn dt(&self) -> f64 {
     self.dt
+  }
+}
+
+#[derive(Debug,Copy,Clone)]
+#[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
+pub struct RungeKuttaFehlberg {
+  dt: f64,
+  dt_min: f64,
+  dt_max: f64,
+  tolerance: f64
+}
+
+#[derive(Debug,Copy,Clone)]
+#[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
+pub struct RungeKuttaFehlbergBuilder {
+  solver: RungeKuttaFehlberg,
+}
+
+impl RungeKuttaFehlberg {
+  pub fn new() -> RungeKuttaFehlbergBuilder {
+    RungeKuttaFehlbergBuilder {
+      solver: RungeKuttaFehlberg {
+        dt: 0.01,
+        dt_max: 0.1,
+        dt_min: 0.001,
+        tolerance: 0.001,
+      }
+    }
+  }
+}
+
+impl RungeKuttaFehlbergBuilder {
+  pub fn build(mut self) -> RungeKuttaFehlberg {
+    if self.solver.dt_min >= self.solver.dt_max {
+      panic!("dt_min must be <= dt_max");
+    }
+    self.solver.dt = self.solver.dt_max;
+    self.solver
+  }
+
+  pub fn with_dt(&mut self, dt: f64) -> &mut RungeKuttaFehlbergBuilder {
+    if dt <= 0.0 {
+      panic!("dt must be positive");
+    }
+    self.solver.dt = dt;
+    self
+  }
+
+  pub fn with_dt_min(&mut self, dt_min: f64) -> &mut RungeKuttaFehlbergBuilder {
+    if dt_min <= 0.0 {
+      panic!("dt_min must be positive");
+    }
+    self.solver.dt_min = dt_min;
+    self
+  }
+
+  pub fn with_dt_max(&mut self, dt_max: f64) -> &mut RungeKuttaFehlbergBuilder {
+    if dt_max <= 0.0 {
+      panic!("dt_max must be positive");
+    }
+    self.solver.dt_max = dt_max;
+    self
+  }
+
+  pub fn with_tolerance(&mut self, tol: f64) -> &mut RungeKuttaFehlbergBuilder {
+    if tol <= 0.0 {
+      panic!("tolerance must be positive");
+    }
+    self.solver.tolerance = tol;
+    self
+  }
+}
+
+impl RungeKuttaSolver for RungeKuttaFehlberg {
+  fn t_coefficients() -> &'static [f64] {
+    &[0.0, 0.25, 3.0/8.0, 12.0/13.0, 1.0, 0.5]
+  }
+
+  fn k_coefficients() -> &'static [&'static [f64]] {
+    &[
+      &[0.0, 0.0, 0.0, 0.0, 0.0],
+      &[1.0/4.0, 0.0, 0.0, 0.0, 0.0],
+      &[3.0/32.0, 9.0/32.0, 0.0, 0.0, 0.0],
+      &[1932.0/2197.0, -7200.0/2197.0, 7296.0/2197.0, 0.0, 0.0],
+      &[439.0/216.0, -8.0, 3680.0/513.0, -845.0/4104.0, 0.0],
+      &[-8.0/27.0, 2.0, -3544.0/2565.0, 1859.0/4104.0, -11.0/40.0]
+    ]
+  }
+
+  fn avg_coefficients() -> &'static [f64] {
+    &[25.0/216.0, 0.0, 1408.0/2565.0, 2197.0/4104.0, -1.0/5.0, 0.0]
+  }
+
+  fn error_coefficients() -> &'static [f64] {
+    &[1.0/360.0, 0.0, -128.0/4275.0, -2197.0/75240.0, 1.0/50.0, 2.0/55.0]
+  }
+
+  fn dt(&self) -> f64 {
+    self.dt
+  }
+
+  fn update_dt(&mut self, error: f64) -> Result<bool, String>{
+    let delta = 0.84 * (self.tolerance/error).powf(0.25);
+    if delta <= 0.1 {
+      self.dt *= 0.1;
+    } else if delta >= 4.0 {
+      self.dt *= 4.0;
+    } else {
+      self.dt *= delta;
+    }
+
+    if self.dt > self.dt_max {
+      self.dt = self.dt_max;
+    }
+
+    if self.dt < self.dt_min {
+      Err("Mininum dt exceeded".to_owned())
+    } else {
+      Ok(error <= self.tolerance)
+    }
+  }
+
+  fn adaptive() -> bool {
+    true
   }
 }
