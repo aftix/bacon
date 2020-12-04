@@ -8,6 +8,7 @@ edition = "2018"
 serialize=["serde"]
 
 [dependencies]
-uom="0.30.0"
-lazy_static="1.2.0"
-serde={version="1.0.117", optional=true}
+lazy_static="1.2"
+serde={version="1.0", optional=true}
+nalgebra="0.23"
+float-cmp="0.8"
