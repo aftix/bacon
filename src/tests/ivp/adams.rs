@@ -82,13 +82,14 @@ fn pc_test_exp() {
   let t_initial = 0.0;
   let t_final = 5.0;
 
-  let solver = PredictorCorrector::default().with_dt_min(1e-5).with_dt_max(1e-3).with_tolerance(1e-10).build();
+  let solver = PredictorCorrector::default().with_dt_min(1e-5).with_dt_max(0.001).with_tolerance(1e-10).build();
 
   let path = adams(solver, (t_initial, t_final), &[1.0], exp_deriv, &mut ());
 
   match path {
     Ok(path) => {
       for step in &path {
+        println!("{} {}", step.1.column(0)[0], step.0.exp());
         assert!(approx_eq!(f64, step.1.column(0)[0], step.0.exp(), epsilon = 0.001));
       }
     },

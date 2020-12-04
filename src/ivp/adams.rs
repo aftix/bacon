@@ -65,7 +65,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
 
   let mut last = false;
   let mut nflag = true;
-  let mut time = t_initial + considering.len() as f64 * solver.dt();
+  let mut time = considering.back().unwrap().0;
 
   if time > t_final {
     for c in &considering {
@@ -80,8 +80,9 @@ pub fn adams<T: Clone, S: AdamsSolver>(
       predictor += solver.dt() * &memory[considering.len() - i - 1] * S::predictor_coefficients()[i];
     }
 
+    let implicit = derivs(time + solver.dt(), predictor.column(0).as_slice(), &mut params_considering);
+
     if S::predictor_corrector() {
-      let implicit = derivs(time, predictor.column(0).as_slice(), &mut params_considering);
       let mut corrector = considering.back().unwrap().1.clone();
       for i in 0..considering.len() {
         corrector += solver.dt() * &memory[considering.len() - i - 1] * S::corrector_coefficients()[i+1];
@@ -90,7 +91,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
 
       let error = (&corrector - &predictor).norm() * S::error_coefficient() / solver.dt();
 
-      let mut dt_old = solver.dt();
+      let dt_old = solver.dt();
       let result = solver.update_dt(error)?;
       if result > 0 {
         if nflag {
@@ -104,12 +105,11 @@ pub fn adams<T: Clone, S: AdamsSolver>(
         memory.push_back(implicit);
         considering.pop_front();
         considering.push_back((time + dt_old, corrector.clone()));
-        path.push((time + dt_old, corrector.clone()));
         if last {
           break 'out;
         }
         if result == 2 || time + dt_old > t_final {
-          dt_old = solver.dt();
+          let mut dt_old = solver.dt();
           if time + 4.0*solver.dt() > t_final {
             last = true;
             dt_old = (t_final - time) / (4.0 * solver.dt());
@@ -142,6 +142,10 @@ pub fn adams<T: Clone, S: AdamsSolver>(
           }
 
           nflag = true;
+
+          time = considering.back().unwrap().0;
+        } else {
+          time += dt_old;
         }
       } else if nflag {
         considering.clear();
@@ -188,7 +192,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
       }
 
       memory.pop_front();
-      memory.push_back(derivs(time, predictor.column(0).as_slice(), &mut params_considering));
+      memory.push_back(implicit);
       considering.pop_front();
       considering.push_back((time, predictor));
 
