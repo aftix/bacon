@@ -58,6 +58,7 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
     let old_params = params.clone();
     let mut k: Vec<DVector<f64>> = vec![];
 
+    let mut new_params = old_params.clone();
     for ind in 0..num_k {
       state = path.last().unwrap().1.clone();
       for j in 0..ind {
@@ -70,8 +71,12 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
           params
         ) * solver.dt()
       );
+      if ind == 0 {
+        new_params = params.clone();
+      }
       *params = old_params.clone();
     }
+    *params = new_params.clone();
 
     state = path.last().unwrap().1.clone();
     for (ind, k) in k.iter().enumerate() {
@@ -97,10 +102,14 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
   Ok(path)
 }
 
+#[derive(Debug,Copy,Clone)]
+#[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKutta {
   dt: f64
 }
 
+#[derive(Debug,Copy,Clone)]
+#[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKuttaBuilder {
   solver: RungeKutta,
 }
