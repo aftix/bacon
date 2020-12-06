@@ -1,5 +1,6 @@
-use std::f64;
 use crate::roots;
+use std::f64;
+use nalgebra::DVector;
 
 fn cubic(x: f64) -> f64 {
   x*x*x
@@ -11,6 +12,15 @@ fn sqrt_two(x: f64) -> f64 {
 
 fn exp_xsq(x: f64) -> f64 {
   x.exp() - x*x
+}
+
+// Solve x^n = exp(x) where n is 2+index (since x = exp(x) has no solution)
+fn exp_newton(x: &[f64]) -> DVector<f64> {
+  DVector::from_iterator(x.len(), x.iter().enumerate().map(|(i, x)| x.exp() - x.powi(i as i32 + 2)))
+}
+
+fn exp_newton_deriv(x: &[f64]) -> DVector<f64> {
+  DVector::from_iterator(x.len(), x.iter().enumerate().map(|(i, x)| x.exp() - ((i + 2) as f64) * x.powi(i as i32 + 1)))
 }
 
 #[test]
@@ -44,4 +54,18 @@ fn bisection_expxx() {
   let solution = roots::bisection((a, b), exp_xsq, tol, 1000).unwrap();
 
   assert!(approx_eq!(f64, solution, -0.703467, epsilon=0.0000005));
+}
+
+#[test]
+fn newton_exp() {
+  let start = [0.7, 1.8];
+  let tol = 0.000001;
+  let solution = roots::newton(&start, exp_newton, exp_newton_deriv, tol, 1000).unwrap();
+  assert!(approx_eq!(f64, *solution.get(0).unwrap(), -0.703467, epsilon=0.000001));
+  assert!(approx_eq!(f64, *solution.get(1).unwrap(), 1.85718, epsilon=0.00001));
+
+  let start = [0.7, 4.5];
+  let solution = roots::newton(&start, exp_newton, exp_newton_deriv, tol, 1000).unwrap();
+  assert!(approx_eq!(f64, *solution.get(0).unwrap(), -0.703467, epsilon=0.000001));
+  assert!(approx_eq!(f64, *solution.get(1).unwrap(), 4.5364, epsilon=0.00001));
 }

@@ -1,3 +1,4 @@
+use nalgebra::DVector;
 
 pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64, n_max: usize) -> Result<f64, String> {
   if left >= right {
@@ -19,7 +20,7 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
     return Ok(middle);
   }
 
-  'out: while n <= n_max {
+  while n <= n_max {
     let f_p = f(middle);
     if f_p * f_a > 0.0 {
       left = middle;
@@ -33,16 +34,44 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
     let middle_new = left + half_interval;
 
     if (middle - middle_new).abs() / middle.abs() < tol {
-      break 'out;
+      return Ok(middle_new);
     }
 
     middle = middle_new;
     n += 1;
   }
 
-  if n > n_max {
-    return Err("Maximum iterations exceeded".to_owned());
+  Err("Maximum iterations exceeded".to_owned())
+}
+
+pub fn newton(
+  initial: &[f64],
+  f: fn(&[f64]) -> DVector<f64>,
+  f_deriv: fn(&[f64]) -> DVector<f64>,
+  tol: f64,
+  n_max: usize
+) -> Result<DVector<f64>, String> {
+  let mut guess = DVector::from_column_slice(initial);
+  let mut norm = guess.norm();
+  let mut n = 0;
+
+  while n < n_max {
+    let f_val = f(guess.column(0).as_slice());
+    let f_deriv_val = f_deriv(guess.column(0).as_slice());
+    let adjustment = DVector::from_iterator(
+      guess.column(0).len(),
+      f_val.column(0).iter().zip(f_deriv_val.column(0).iter()).map(|(f, f_d)| f / f_d)
+    );
+    let new_guess = &guess - adjustment;
+    let new_norm = new_guess.norm();
+    if ((norm - new_norm) / norm).abs() < tol || approx_eq!(f64, 0.0, new_norm, epsilon = tol){
+      return Ok(new_guess);
+    }
+
+    norm = new_norm;
+    guess = new_guess;
+    n += 1;
   }
 
-  Ok(middle)
+  Err("Maximum iterations exceeded".to_owned())
 }
