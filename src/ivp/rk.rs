@@ -1,40 +1,81 @@
 use nalgebra::DVector;
 
+/// This trait allows a struct to be used in the Runge-Kutta solver.
+///
+/// # Examples
+/// See `struct RungeKutta` and `struct RungeKuttaFehlberg` for examples of implementing
+/// this trait.
 pub trait RungeKuttaSolver {
-  // Upper left portion of the tableaux
+  /// Returns a slice of coeffecients to multiply the time step by when getting
+  /// intermediate results. Upper-left portion of Butch Tableaux
   fn t_coefficients() -> &'static [f64];
 
-  // upper right portion of the tableaux
+  /// Returns the coefficients to use on the k_i's when finding another
+  /// k_i. Upper-right portion of the Butch Tableax. Should be
+  /// an NxN-1 matrix, where N is the order of the Runge-Kutta Method (Or order+1 for
+  /// adaptive methods)
   fn k_coefficients() -> &'static [&'static [f64]];
 
-  // Coeffecients to use when combining the partial steps with in the weighted averaging
+  /// Coefficients to use when calculating the final step to take.
+  /// These are the weights of the weighted average of k_i's. Bottom
+  /// portion of the Butch Tableaux. For adaptive methods, this is the first
+  /// row of the bottom portion.
   fn avg_coefficients() -> &'static [f64];
 
-  // Coeffecients for finding the error in adaptive methods
-  // Only used when adaptive is on, so non-adaptive methods don't
-  //  need to match dimension with the other coefficients
+  /// Used for adaptive methods only. Coefficients to use on
+  /// the k_i's to find the error between the two orders
+  /// of Runge-Kutta methods. In the Butch Tableaux, this is
+  /// the first row of the bottom portion minus the second row.
   fn error_coefficients() -> &'static [f64] {
     &[0.0]
   }
 
-  // Get the time step
+  /// Return this method's current time step
   fn dt(&self) -> f64;
 
-  // Is this solver adaptive time step?
+  /// Returns whether or not this method is adaptive
   fn adaptive() -> bool {
     false
   }
 
-  // For adaptive solvers, update dt
-  // Returns Ok(true) if state should be accepted
-  // Returns Ok(false) if state should be rejected
-  // Returns Err on error
+  /// Used for adaptive solvers to update the timestep based on
+  /// the current error.
+  ///
+  /// # Returns
+  /// Returns Ok(true) if this step should be accepted, Ok(false) if this step
+  /// should be rejected, and Err if the timestep became less than the minimum value.
   fn update_dt(&mut self, _error: f64) -> Result<bool, String> {
     Ok(true)
   }
 }
 
-// Use a runge-kutta method to solve an IVP
+/// Use a Runge-Kutta method to solve an initial value problem.
+///
+/// This function takes a Runge-Kutta solver, adaptive or not,
+/// and solves an initial value problem defined by `y_0` as the initial
+/// value and `derivs` as the derivative function.
+///
+/// # Return
+/// On success, an `Ok(vec)` where `vec` is a vector of steps
+/// of the form (t_n, y_n) with y_n being a vector.
+///
+/// # Params
+/// `(t_initial, t_final)` Interval to solve the initial value problem on
+/// `y_0` initial values for the ivp
+/// `derivs` Derivative function. Should take the arguments `(time, slice of all y_n's, params)` where
+/// y_n is the value of the initial value problem at time `time`.
+/// `params` Mutable reference to a type that implements `Clone`. `params` is cloned
+/// for all intermediate steps done by the solver so that `derivs` at `t_n+1` gets
+/// the params passed from `derivs` at `t_n`, not some intermediate `k` step.
+///
+/// # Examples
+///
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let rk = RungeKutta::default().with_dt(0.01).build();
+/// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
 pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
   mut solver: S,
   (t_initial, t_final): (f64,f64),
@@ -97,12 +138,22 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
   Ok(path)
 }
 
+/// Solver for the fourth order Runge-Kutta method
+///
+/// # Examples
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let rk = RungeKutta::default().with_dt(0.01).build();
+/// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKutta {
   dt: f64
 }
 
+/// Builds a RungeKutta solver
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKuttaBuilder {
@@ -110,6 +161,7 @@ pub struct RungeKuttaBuilder {
 }
 
 impl RungeKutta {
+  /// Get a builder to make a RungeKutta solver
   pub fn default() -> RungeKuttaBuilder {
     RungeKuttaBuilder {
       solver: RungeKutta{
@@ -120,10 +172,12 @@ impl RungeKutta {
 }
 
 impl RungeKuttaBuilder {
+  /// Make a RungeKutta solver out of this builder
   pub fn build(self) -> RungeKutta {
     self.solver
   }
 
+  /// Set the timestep for the RungeKutta solver
   pub fn with_dt(&mut self, dt: f64) -> &mut RungeKuttaBuilder {
     if dt <= 0.0 {
       panic!("dt must be positive");
@@ -156,6 +210,15 @@ impl RungeKuttaSolver for RungeKutta {
   }
 }
 
+/// Solver for the Runge-Kutta-Fehlberg Solver
+///
+/// # Examples
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.01).build();
+/// let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ());
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKuttaFehlberg {
@@ -165,6 +228,7 @@ pub struct RungeKuttaFehlberg {
   tolerance: f64
 }
 
+/// Builder for a RungeKuttaFehlberg solver
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKuttaFehlbergBuilder {
@@ -172,6 +236,7 @@ pub struct RungeKuttaFehlbergBuilder {
 }
 
 impl RungeKuttaFehlberg {
+  /// Get a builder for a new RungeKuttaFehlberg solver
   pub fn default() -> RungeKuttaFehlbergBuilder {
     RungeKuttaFehlbergBuilder {
       solver: RungeKuttaFehlberg {
@@ -185,6 +250,7 @@ impl RungeKuttaFehlberg {
 }
 
 impl RungeKuttaFehlbergBuilder {
+  /// Build this RungeKuttaFehlberg solver
   pub fn build(mut self) -> RungeKuttaFehlberg {
     if self.solver.dt_min >= self.solver.dt_max {
       panic!("dt_min must be <= dt_max");
@@ -193,14 +259,7 @@ impl RungeKuttaFehlbergBuilder {
     self.solver
   }
 
-  pub fn with_dt(&mut self, dt: f64) -> &mut RungeKuttaFehlbergBuilder {
-    if dt <= 0.0 {
-      panic!("dt must be positive");
-    }
-    self.solver.dt = dt;
-    self
-  }
-
+  /// Set the minimum timestep for this solver
   pub fn with_dt_min(&mut self, dt_min: f64) -> &mut RungeKuttaFehlbergBuilder {
     if dt_min <= 0.0 {
       panic!("dt_min must be positive");
@@ -209,6 +268,7 @@ impl RungeKuttaFehlbergBuilder {
     self
   }
 
+  /// Set the maximum timestep for this solver.
   pub fn with_dt_max(&mut self, dt_max: f64) -> &mut RungeKuttaFehlbergBuilder {
     if dt_max <= 0.0 {
       panic!("dt_max must be positive");
@@ -217,6 +277,7 @@ impl RungeKuttaFehlbergBuilder {
     self
   }
 
+  /// Set the error tolerance for this solver
   pub fn with_tolerance(&mut self, tol: f64) -> &mut RungeKuttaFehlbergBuilder {
     if tol <= 0.0 {
       panic!("tolerance must be positive");

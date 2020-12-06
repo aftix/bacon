@@ -75,7 +75,6 @@ use std::collections::HashMap;
 
   From:  http://physics.nist.gov/constants
 */
-
 lazy_static! {
   pub static ref CODATA: HashMap<&'static str, (f64, f64, &'static str)> = {
     let mut m = HashMap::new();
