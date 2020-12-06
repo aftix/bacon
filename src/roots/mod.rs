@@ -55,6 +55,10 @@ pub fn newton(
   let mut norm = guess.norm();
   let mut n = 0;
 
+  if approx_eq!(f64, 0.0, norm, epsilon = tol) {
+    return Ok(guess);
+  }
+
   while n < n_max {
     let f_val = f(guess.column(0).as_slice());
     let f_deriv_val = f_deriv(guess.column(0).as_slice());
@@ -70,6 +74,49 @@ pub fn newton(
 
     norm = new_norm;
     guess = new_guess;
+    n += 1;
+  }
+
+  Err("Maximum iterations exceeded".to_owned())
+}
+
+pub fn secant(
+  initial: (&[f64], &[f64]),
+  f: fn(&[f64]) -> DVector<f64>,
+  tol: f64,
+  n_max: usize
+) -> Result<DVector<f64>, String> {
+  let mut n = 0;
+
+  let mut left = DVector::from_column_slice(initial.0);
+  let mut right = DVector::from_column_slice(initial.1);
+
+  let mut left_val = f(initial.0);
+  let mut right_val = f(initial.1);
+
+  let mut norm = right.norm();
+  if approx_eq!(f64, 0.0, norm, epsilon = tol) {
+    return Ok(right);
+  }
+
+  while n <= n_max {
+    let adjustment = DVector::from_iterator(
+      right_val.iter().len(),
+      right_val.iter().enumerate().map(|(i, q)| {
+        q * (*right.get(i).unwrap() - *left.get(i).unwrap()) / (q - *left_val.get(i).unwrap())
+      })
+    );
+    let new_guess = &right - adjustment;
+    let new_norm = new_guess.norm();
+    if ((norm - new_norm) / norm).abs() < tol || approx_eq!(f64, 0.0, new_norm, epsilon = tol) {
+      return Ok(new_guess);
+    }
+
+    norm = new_norm;
+    left_val = right_val;
+    left = right;
+    right = new_guess;
+    right_val = f(right.column(0).as_slice());
     n += 1;
   }
 
