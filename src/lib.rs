@@ -15,6 +15,7 @@ extern crate num_traits;
 pub mod constants;
 pub mod ivp;
 pub mod roots;
+pub mod polynomial;
 
 #[cfg(test)]
 mod tests;

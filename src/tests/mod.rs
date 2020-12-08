@@ -6,3 +6,4 @@
 
 mod ivp;
 mod roots;
+mod polynomial;
