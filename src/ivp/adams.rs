@@ -1,30 +1,94 @@
 use nalgebra::DVector;
 use std::collections::VecDeque;
 
+/// This trait allows a struct to be used in the Adams-Bashforth/Predictor-corrector solver.
+///
+/// # Examples
+/// See `struct AdamsBashforth` and `struct PredictorCorrector` for examples of
+/// implementing this trait.
 pub trait AdamsSolver {
+  /// Returns a slice of coefficients to weight the previous
+  /// steps of the explicit solver with. The length of the slice
+  /// is the order of the predictor.
+  /// The first element is the weight of the n-1 step,
+  /// the next is the n-2 step, etc.
   fn predictor_coefficients() -> &'static [f64];
 
+  /// Returns a slice of coefficients to weight the
+  /// previous steps of the implicit solver with. The length
+  /// of the slice is the order of the corrector.
+  /// The length must be at most 1 more than the predictor
+  /// coefficients (so if the predictor uses previous function
+  /// evaluations up to n-k then the corrector can only use up to n-k).
   fn corrector_coefficients() -> &'static [f64] {
     &[]
   }
 
+  /// Returns true if this is an adaptive predictor-corrector method.
+  /// If this is false, corrector_coefficients is never called.
   fn predictor_corrector() -> bool {
     false
   }
 
+  /// Returns the current timestep
   fn dt(&self) -> f64;
 
   // 0 = fail, 1 = pass with no update, 2 = pass with update
+  /// For predictor-correctors, update the current timestep based on the error.
+  ///
+  /// # Return
+  /// Returns an Ok(0) if the last step failed, Ok(1) if the last step
+  /// passed with no update to dt, and Ok(2) if the last step passed
+  /// with an update to dt. Returns Err if the timestep goes under the
+  /// minimum timestep specified.
   fn update_dt(&mut self, _error: f64) -> Result<u8, String> {
     Ok(1)
   }
 
+  /// For predictor-corrector methods, the value to weight the error by.
   fn error_coefficient() -> f64 {
     0.0
   }
 }
 
 // Use an adams method to solve an IVP
+/// Use an Adams-Bashforth method or an
+/// Adams-Bashforth/Adams-Moulton predictor-corrector to solve an IVP
+///
+/// This function takes an Adams-Bashforth or Adams-Bashforth/Adams-Moulton predictor-corrector
+/// solver and solves an initial value problem defined by `y_0' as the initial value
+/// and `derivs` as the derivative function. The initial few steps to start the
+/// solver and the initial steps taken after a change in dt are done using
+/// the classic Runge-Kutta fourth order method.
+///
+/// # Return
+/// On success, an `Ok(vec)` where `vec` is a vector of steps of the
+/// form `(t_n, y_n)` with y_n being a vector equal in dimension to
+/// `y_0`.
+///
+/// # Params
+/// `solver` a solver implementing `AdamsSolver`.
+///
+/// `(t_initial, t_final)` Interval to solve the intial value problem on
+///
+/// `y_0` initial values for the ivp
+///
+/// `derivs` Derivative function. Should take the argument `(time, slice of all y_n's, params)`
+/// where y_n is the value of the initial value problem at time `time`.
+///
+/// `params` Mutable reference to a type that implements `Clone`. `params` is cloned
+/// for all intermediate steps done by the solver so that `derivs` at `t_n+1` gets
+/// the params passed from `derivs` at `t_n`, not some intermediate `k` step.
+///
+/// # Examples
+/// ```
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let adam = AdamsBashforth::default().with_dt(0.01).build();
+/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 pub fn adams<T: Clone, S: AdamsSolver>(
   mut solver: S,
   (t_initial, t_final): (f64,f64),
@@ -200,13 +264,24 @@ pub fn adams<T: Clone, S: AdamsSolver>(
   Ok(path)
 }
 
-// Fourth order adams bashforth solver
+/// Solver for the fourth order Adams-Basforth method
+///
+/// # Examples
+/// ```
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let adam = AdamsBashforth::default().with_dt(0.01).build();
+/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct AdamsBashforth {
   dt: f64,
 }
 
+/// Builds an AdamsBashforth
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct AdamsBashforthBuilder {
@@ -214,6 +289,7 @@ pub struct AdamsBashforthBuilder {
 }
 
 impl AdamsBashforth {
+  /// Get a builder to make an AdamsBashforth solver
   pub fn default() -> AdamsBashforthBuilder {
     AdamsBashforthBuilder {
       solver: AdamsBashforth{
@@ -224,10 +300,12 @@ impl AdamsBashforth {
 }
 
 impl AdamsBashforthBuilder {
+  /// Make an AdamsBashforth solver
   pub fn build(self) -> AdamsBashforth {
     self.solver
   }
 
+  /// Set the timestep for this solver
   pub fn with_dt(&mut self, dt: f64) -> &mut AdamsBashforthBuilder {
     self.solver.dt = dt;
     self
@@ -245,6 +323,17 @@ impl AdamsSolver for AdamsBashforth {
 }
 
 // Fourth order adams predictor corrector
+/// Fourth order predictor-corrector solver
+///
+/// # Examples
+/// ```
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
+///   DVector::from_iterator(y.len(), y.iter())
+/// }
+/// ...
+/// let adam = PredictorCorrector::default().with_dt_max(0.01).with_dt_min(0.0001).tolerance(0.001).build();
+/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct PredictorCorrector {
@@ -254,6 +343,7 @@ pub struct PredictorCorrector {
   tolerance: f64
 }
 
+/// Builder for a PredictorCorrector solver
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct PredictorCorrectorBuilder {
@@ -261,6 +351,7 @@ pub struct PredictorCorrectorBuilder {
 }
 
 impl PredictorCorrector {
+  /// Make a builder to get a PredictorCorrector solver
   pub fn default() -> PredictorCorrectorBuilder {
     PredictorCorrectorBuilder {
       solver: PredictorCorrector {
@@ -274,6 +365,7 @@ impl PredictorCorrector {
 }
 
 impl PredictorCorrectorBuilder {
+  /// Get a PredictorCorrector solver
   pub fn build(mut self) -> PredictorCorrector {
     if self.solver.dt_min >= self.solver.dt_max {
       panic!("dt_min must be <= dt_max");
@@ -282,14 +374,7 @@ impl PredictorCorrectorBuilder {
     self.solver
   }
 
-  pub fn with_dt(&mut self, dt: f64) -> &mut PredictorCorrectorBuilder {
-    if dt <= 0.0 {
-      panic!("dt must be positive");
-    }
-    self.solver.dt = dt;
-    self
-  }
-
+  /// Set the minimum timestep for this solver
   pub fn with_dt_min(&mut self, dt_min: f64) -> &mut PredictorCorrectorBuilder {
     if dt_min <= 0.0 {
       panic!("dt_min must be positive");
@@ -298,6 +383,7 @@ impl PredictorCorrectorBuilder {
     self
   }
 
+  /// Set the maximum timestep for this solver
   pub fn with_dt_max(&mut self, dt_max: f64) -> &mut PredictorCorrectorBuilder {
     if dt_max <= 0.0 {
       panic!("dt_max must be positive");
@@ -306,6 +392,7 @@ impl PredictorCorrectorBuilder {
     self
   }
 
+  /// Set the error tolerance for this solver
   pub fn with_tolerance(&mut self, tol: f64) -> &mut PredictorCorrectorBuilder {
     if tol <= 0.0 {
       panic!("tolerance must be positive");

@@ -57,25 +57,33 @@ pub trait RungeKuttaSolver {
 ///
 /// # Return
 /// On success, an `Ok(vec)` where `vec` is a vector of steps
-/// of the form (t_n, y_n) with y_n being a vector.
+/// of the form `(t_n, y_n)` with y_n being a vector equal in
+/// dimension to `y_0`.
 ///
 /// # Params
+/// `solver` A solver implementing `RungeKuttaSolver`
+///
 /// `(t_initial, t_final)` Interval to solve the initial value problem on
+///
 /// `y_0` initial values for the ivp
+///
 /// `derivs` Derivative function. Should take the arguments `(time, slice of all y_n's, params)` where
 /// y_n is the value of the initial value problem at time `time`.
+///
 /// `params` Mutable reference to a type that implements `Clone`. `params` is cloned
 /// for all intermediate steps done by the solver so that `derivs` at `t_n+1` gets
 /// the params passed from `derivs` at `t_n`, not some intermediate `k` step.
 ///
 /// # Examples
 ///
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
+/// ```
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_iterator(y.len(), y.iter())
 /// }
 /// ...
 /// let rk = RungeKutta::default().with_dt(0.01).build();
 /// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
   mut solver: S,
   (t_initial, t_final): (f64,f64),
@@ -141,12 +149,14 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
 /// Solver for the fourth order Runge-Kutta method
 ///
 /// # Examples
+/// ```
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
 ///   DVector::from_iterator(y.len(), y.iter())
 /// }
 /// ...
 /// let rk = RungeKutta::default().with_dt(0.01).build();
 /// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKutta {
@@ -213,12 +223,14 @@ impl RungeKuttaSolver for RungeKutta {
 /// Solver for the Runge-Kutta-Fehlberg Solver
 ///
 /// # Examples
+/// ```
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
 ///   DVector::from_iterator(y.len(), y.iter())
 /// }
 /// ...
 /// let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.01).build();
 /// let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
 pub struct RungeKuttaFehlberg {

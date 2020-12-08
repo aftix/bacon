@@ -12,10 +12,14 @@ pub use adams::*;
 ///
 /// # Params
 /// `(t_initial, t_final)` Interval to solve the ivp over
+///
 /// `y_0` Initial value, slice
+///
 /// `dt`  Timestep to use between iterations
+///
 /// `derivs` Derivative function for initial value problem. The arguments to
 ///   this functions should be (time, slice of current y_n's, mutable parameter object)
+///
 /// `params` Mutable reference to pass to `derivs`.
 ///
 /// # Return
