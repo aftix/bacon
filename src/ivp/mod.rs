@@ -5,6 +5,7 @@
  */
 
 use nalgebra::{DVector};
+use alga::general::{ComplexField, RealField};
 
 pub mod rk;
 pub mod adams;
@@ -46,13 +47,13 @@ pub use adams::*;
 ///   let path = euler((0.0, 1.0), &[1.0], 0.01, derivative, &mut ());
 /// }
 /// ```
-pub fn euler<T>(
-  (t_initial, t_final): (f64, f64),
-  y_0: &[f64],
-  dt: f64,
-  derivs: fn(f64, &[f64], &mut T) -> DVector<f64>,
+pub fn euler<N: RealField, M: ComplexField+From<N>, T>(
+  (t_initial, t_final): (N, N),
+  y_0: &[M],
+  dt: N,
+  derivs: fn(N, &[M], &mut T) -> DVector<M>,
   params: &mut T
-) -> Vec<(f64, DVector<f64>)> {
+) -> Vec<(N, DVector<M>)> {
   let mut state = DVector::from_column_slice(y_0);
   let mut path = vec![(t_initial, state.clone())];
 
@@ -60,7 +61,7 @@ pub fn euler<T>(
 
   while time < t_final {
     let f = derivs(time, state.column(0).as_slice(), params);
-    state += dt * f;
+    state += f * M::from(dt);
     time += dt;
     path.push((time, state.clone()));
   }
