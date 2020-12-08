@@ -21,12 +21,12 @@ fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
 
 // Test runge-kutta method on y = exp(t)
 #[test]
-fn rk_test_exp() {
+fn rk_test_exp() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 10.0;
   let dt = 0.01;
 
-  let solver = RungeKutta::default().with_dt(dt).build();
+  let solver = RungeKutta::default().with_dt(dt)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[1.0], exp_deriv, &mut ());
 
@@ -38,16 +38,18 @@ fn rk_test_exp() {
     },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test runge-kutta method on y = 1 - t^2
 #[test]
-fn rk_test_quadratic() {
+fn rk_test_quadratic() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 10.0;
   let dt = 0.01;
 
-  let solver = RungeKutta::default().with_dt(dt).build();
+  let solver = RungeKutta::default().with_dt(dt)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[1.0], quadratic_deriv, &mut ());
 
@@ -59,16 +61,18 @@ fn rk_test_quadratic() {
       },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test runge-kutta method on y = sin(t)
 #[test]
-fn rk_test_sine() {
+fn rk_test_sine() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 10.0;
   let dt = 0.01;
 
-  let solver = RungeKutta::default().with_dt(dt).build();
+  let solver = RungeKutta::default().with_dt(dt)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[0.0], sine_deriv, &mut ());
 
@@ -80,15 +84,17 @@ fn rk_test_sine() {
       },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test runge-kutta-fehlberg method on y = exp(t)
 #[test]
-fn rkf_test_exp() {
+fn rkf_test_exp() -> Result<(), String>{
   let t_initial = 0.0;
   let t_final = 10.0;
 
-  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.0001).build();
+  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001)?.with_dt_max(0.01)?.with_tolerance(0.0001)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[1.0], exp_deriv, &mut ());
 
@@ -100,15 +106,17 @@ fn rkf_test_exp() {
       },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test runge-kutta-fehlberg method on y = 1 - t^2
 #[test]
-fn rkf_test_quadratic() {
+fn rkf_test_quadratic() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 20.0;
 
-  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.0001).build();
+  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001)?.with_dt_max(0.01)?.with_tolerance(0.0001)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[1.0], quadratic_deriv, &mut ());
 
@@ -120,15 +128,17 @@ fn rkf_test_quadratic() {
       },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test runge-kutta-fehlberg method on y = sin(t)
 #[test]
-fn rkf_test_sine() {
+fn rkf_test_sine() -> Result<(), String>{
   let t_initial = 0.0;
   let t_final = 20.0;
 
-  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.0001).build();
+  let solver = RungeKuttaFehlberg::default().with_dt_min(0.001)?.with_dt_max(0.01)?.with_tolerance(0.0001)?.build()?;
 
   let path = runge_kutta(solver, (t_initial, t_final), &[0.0], sine_deriv, &mut ());
 
@@ -140,6 +150,8 @@ fn rkf_test_sine() {
       },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // TODO: Add more runge-kutta tests

@@ -97,9 +97,10 @@ type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 ///   DVector::from_column_slice(y)
 /// }
 /// //...
-/// fn example() {
-///   let adam = AdamsBashforth::default().with_dt(0.01).build();
+/// fn example() -> Result<(), String> {
+///   let adam = AdamsBashforth::default().with_dt(0.01)?.build()?;
 ///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+///   Ok(())
 /// }
 /// ```
 pub fn adams<S: AdamsSolver, T: Clone>(
@@ -116,7 +117,7 @@ pub fn adams<S: AdamsSolver, T: Clone>(
 
   let mut considering = VecDeque::with_capacity(S::predictor_coefficients().len());
 
-  let rk = super::RungeKutta::<S::Complex>::default().with_dt(solver.dt()).build();
+  let rk = super::RungeKutta::<S::Complex>::default().with_dt(solver.dt())?.build()?;
   let initial = super::runge_kutta(
       rk,
       (
@@ -200,7 +201,7 @@ pub fn adams<S: AdamsSolver, T: Clone>(
           considering.clear();
           memory.clear();
           *params = params_considering.clone();
-          let rk = super::RungeKutta::default().with_dt(dt_old).build();
+          let rk = super::RungeKutta::default().with_dt(dt_old)?.build()?;
           let initial = super::runge_kutta(
               rk,
               (time, time + S::Complex::from(S::predictor_coefficients().len() as f64).real() * dt_old),
@@ -229,7 +230,7 @@ pub fn adams<S: AdamsSolver, T: Clone>(
         considering.clear();
         memory.clear();
         *params = params_considering.clone();
-        let rk = super::RungeKutta::default().with_dt(solver.dt()).build();
+        let rk = super::RungeKutta::default().with_dt(solver.dt())?.build()?;
         let initial = super::runge_kutta(
             rk,
             (time, time + S::Complex::from(S::predictor_coefficients().len() as f64).real() * solver.dt()),
@@ -291,9 +292,10 @@ pub fn adams<S: AdamsSolver, T: Clone>(
 ///   DVector::from_column_slice(y)
 /// }
 /// ///...
-/// fn example() {
-///   let adam = AdamsBashforth::default().with_dt(0.01).build();
+/// fn example() -> Result<(), String> {
+///   let adam = AdamsBashforth::default().with_dt(0.01)?.build()?;
 ///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+///   Ok(())
 /// }
 /// ```
 #[derive(Debug,Copy,Clone)]
@@ -322,14 +324,17 @@ impl<N: ComplexField+From<f64>+Copy> AdamsBashforth<N> {
 
 impl<N: ComplexField+From<f64>+Copy> AdamsBashforthBuilder<N> {
   /// Make an AdamsBashforth solver
-  pub fn build(self) -> AdamsBashforth<N> {
-    self.solver
+  pub fn build(self) -> Result<AdamsBashforth<N>, String> {
+    Ok(self.solver)
   }
 
   /// Set the timestep for this solver
-  pub fn with_dt(&mut self, dt: <N as ComplexField>::RealField) -> &mut AdamsBashforthBuilder<N> {
+  pub fn with_dt(&mut self, dt: <N as ComplexField>::RealField) -> Result<&mut AdamsBashforthBuilder<N>, String> {
+    if !dt.is_sign_positive() {
+      return Err("AdamsBashforthBuilder: dt must be positive".to_owned());
+    }
     self.solver.dt = dt;
-    self
+    Ok(self)
   }
 }
 
@@ -360,9 +365,10 @@ impl<N: ComplexField+From<f64>+Copy> AdamsSolver for AdamsBashforth<N> {
 ///   DVector::from_column_slice(y)
 /// }
 /// //...
-/// fn example() {
-///   let adam = PredictorCorrector::default().with_dt_max(0.01).with_dt_min(0.0001).with_tolerance(0.001).build();
+/// fn example() -> Result<(), String> {
+///   let adam = PredictorCorrector::default().with_dt_max(0.01)?.with_dt_min(0.0001)?.with_tolerance(0.001)?.build()?;
 ///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+///   Ok(())
 /// }
 /// ```
 #[derive(Debug,Copy,Clone)]
@@ -397,39 +403,39 @@ impl<N: ComplexField+From<f64>+Copy> PredictorCorrector<N> {
 
 impl<N: ComplexField+From<f64>+Copy> PredictorCorrectorBuilder<N> {
   /// Get a PredictorCorrector solver
-  pub fn build(mut self) -> PredictorCorrector<N> {
+  pub fn build(mut self) -> Result<PredictorCorrector<N>, String> {
     if self.solver.dt_min >= self.solver.dt_max {
-      panic!("dt_min must be <= dt_max");
+      return Err("PredictorCorrectorBuilder: dt_min must be <= dt_max".to_owned());
     }
     self.solver.dt = self.solver.dt_max;
-    self.solver
+    Ok(self.solver)
   }
 
   /// Set the minimum timestep for this solver
-  pub fn with_dt_min(&mut self, dt_min: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+  pub fn with_dt_min(&mut self, dt_min: <N as ComplexField>::RealField) -> Result<&mut PredictorCorrectorBuilder<N>, String> {
     if !dt_min.is_sign_positive() {
-      panic!("dt_min must be positive");
+      return Err("PredictorCorrectorBuilder: dt_min must be positive".to_owned());
     }
     self.solver.dt_min = dt_min;
-    self
+    Ok(self)
   }
 
   /// Set the maximum timestep for this solver
-  pub fn with_dt_max(&mut self, dt_max: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+  pub fn with_dt_max(&mut self, dt_max: <N as ComplexField>::RealField) -> Result<&mut PredictorCorrectorBuilder<N>, String> {
     if !dt_max.is_sign_positive() {
-      panic!("dt_max must be positive");
+      return Err("PredictorCorrectorBuilder: dt_max must be positive".to_owned());
     }
     self.solver.dt_max = dt_max;
-    self
+    Ok(self)
   }
 
   /// Set the error tolerance for this solver
-  pub fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+  pub fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> Result<&mut PredictorCorrectorBuilder<N>, String> {
     if !tol.is_sign_positive() {
-      panic!("tolerance must be positive");
+      return Err("tolerance must be positive".to_owned());
     }
     self.solver.tolerance = tol;
-    self
+    Ok(self)
   }
 }
 
@@ -473,7 +479,7 @@ impl<N: ComplexField+From<f64>+Copy> AdamsSolver for PredictorCorrector<N> {
       }
 
       if self.dt < self.dt_min {
-        return Err("minimum dt exceeded".to_owned());
+        return Err("PredictorCorrector: minimum dt exceeded".to_owned());
       }
 
       return Ok(0);

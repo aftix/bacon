@@ -21,12 +21,12 @@ fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
 
 // Test adams-bashforth on y=exp(t)
 #[test]
-fn adams_test_exp() {
+fn adams_test_exp() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 5.0;
   let dt = 0.001;
 
-  let solver = AdamsBashforth::default().with_dt(dt).build();
+  let solver = AdamsBashforth::default().with_dt(dt)?.build()?;
 
   let path = adams(solver, (t_initial, t_final), &[1.0], exp_deriv, &mut ());
 
@@ -38,16 +38,18 @@ fn adams_test_exp() {
     },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test adams-bashforth on y=1 - t^2
 #[test]
-fn adams_test_quadratic() {
+fn adams_test_quadratic()  -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 5.0;
   let dt = 0.001;
 
-  let solver = AdamsBashforth::default().with_dt(dt).build();
+  let solver = AdamsBashforth::default().with_dt(dt)?.build()?;
 
   let path = adams(solver, (t_initial, t_final), &[1.0], quadratic_deriv, &mut ());
 
@@ -59,16 +61,18 @@ fn adams_test_quadratic() {
     },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test adams-bashforth on y=sine(t)
 #[test]
-fn adams_test_sine() {
+fn adams_test_sine() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 10.0;
   let dt = 0.001;
 
-  let solver = AdamsBashforth::default().with_dt(dt).build();
+  let solver = AdamsBashforth::default().with_dt(dt)?.build()?;
 
   let path = adams(solver, (t_initial, t_final), &[0.0], sine_deriv, &mut ());
 
@@ -80,15 +84,17 @@ fn adams_test_sine() {
     },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
 
 // Test predictor-corrector for y=exp(t)
 #[test]
-fn pc_test_exp() {
+fn pc_test_exp() -> Result<(), String> {
   let t_initial = 0.0;
   let t_final = 5.0;
 
-  let solver = PredictorCorrector::default().with_dt_min(1e-5).with_dt_max(0.001).with_tolerance(1e-10).build();
+  let solver = PredictorCorrector::default().with_dt_min(1e-5)?.with_dt_max(0.001)?.with_tolerance(1e-10)?.build()?;
 
   let path = adams(solver, (t_initial, t_final), &[1.0], exp_deriv, &mut ());
 
@@ -101,4 +107,9 @@ fn pc_test_exp() {
     },
     Err(string) => panic!("Result not Ok: {}", string)
   }
+
+  Ok(())
 }
+
+
+// TODO MORE PC TESTS

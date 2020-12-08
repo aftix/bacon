@@ -95,9 +95,10 @@ type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 /// }
 ///
 /// //...
-/// fn example() {
-///   let rk = RungeKutta::default().with_dt(0.01).build();
+/// fn example() -> Result<(), String> {
+///   let rk = RungeKutta::default().with_dt(0.01)?.build()?;
 ///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+///   Ok(())
 /// }
 /// ```
 pub fn runge_kutta<S: RungeKuttaSolver, T: Clone>(
@@ -172,9 +173,10 @@ pub fn runge_kutta<S: RungeKuttaSolver, T: Clone>(
 ///   DVector::from_column_slice(y)
 /// }
 /// //...
-/// fn example() {
-///   let rk = RungeKutta::default().with_dt(0.01).build();
-///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// fn example() -> Result<(), String>{
+///   let rk = RungeKutta::default().with_dt(0.01)?.build()?;
+///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ())?;
+///   Ok(())
 /// }
 /// ```
 #[derive(Debug,Copy,Clone)]
@@ -203,17 +205,17 @@ impl<N: ComplexField+From<f64>+Copy> RungeKutta<N> {
 
 impl<N: ComplexField+From<f64>+Copy> RungeKuttaBuilder<N> {
   /// Make a RungeKutta solver out of this builder
-  pub fn build(self) -> RungeKutta<N> {
-    self.solver
+  pub fn build(self) -> Result<RungeKutta<N>, String> {
+    Ok(self.solver)
   }
 
   /// Set the timestep for the RungeKutta solver
-  pub fn with_dt(&mut self, dt: <N as ComplexField>::RealField) -> &mut RungeKuttaBuilder<N> {
+  pub fn with_dt(&mut self, dt: <N as ComplexField>::RealField) -> Result<&mut RungeKuttaBuilder<N>, String> {
     if dt <= N::from(0.0).real() {
-      panic!("dt must be positive");
+      return Err("RungeKuttaBuilder: dt must be positive".to_owned());
     }
     self.solver.dt = dt;
-    self
+    Ok(self)
   }
 }
 
@@ -262,9 +264,10 @@ impl<N: ComplexField+From<f64>+Copy> RungeKuttaSolver for RungeKutta<N> {
 ///   DVector::from_column_slice(y)
 /// }
 /// //...
-/// fn example() {
-///   let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.01).build();
-///   let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// fn example() -> Result<(), String> {
+///   let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001)?.with_dt_max(0.01)?.with_tolerance(0.01)?.build()?;
+///   let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ())?;
+///   Ok(())
 /// }
 /// ```
 #[derive(Debug,Copy,Clone)]
@@ -299,39 +302,39 @@ impl<N: ComplexField+From<f64>+Copy> RungeKuttaFehlberg<N> {
 
 impl<N: ComplexField+From<f64>+Copy> RungeKuttaFehlbergBuilder<N> {
   /// Build this RungeKuttaFehlberg solver
-  pub fn build(mut self) -> RungeKuttaFehlberg<N> {
+  pub fn build(mut self) -> Result<RungeKuttaFehlberg<N>, String> {
     if self.solver.dt_min >= self.solver.dt_max {
-      panic!("dt_min must be <= dt_max");
+      return Err("RungeKuttaFehlbergBuilder: dt_min must be <= dt_max".to_owned());
     }
     self.solver.dt = self.solver.dt_max;
-    self.solver
+    Ok(self.solver)
   }
 
   /// Set the minimum timestep for this solver
-  pub fn with_dt_min(&mut self, dt_min: <N as ComplexField>::RealField) -> &mut RungeKuttaFehlbergBuilder<N> {
+  pub fn with_dt_min(&mut self, dt_min: <N as ComplexField>::RealField) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
     if !dt_min.is_sign_positive() {
-      panic!("dt_min must be positive");
+      return Err("RungeKuttaFehlbergBuilder: dt_min must be positive".to_owned());
     }
     self.solver.dt_min = dt_min;
-    self
+    Ok(self)
   }
 
   /// Set the maximum timestep for this solver.
-  pub fn with_dt_max(&mut self, dt_max: <N as ComplexField>::RealField) -> &mut RungeKuttaFehlbergBuilder<N> {
+  pub fn with_dt_max(&mut self, dt_max: <N as ComplexField>::RealField) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
     if !dt_max.is_sign_positive() {
-      panic!("dt_max must be positive");
+      return Err("RungeKuttaFehlbergBuilder: dt_max must be positive".to_owned());
     }
     self.solver.dt_max = dt_max;
-    self
+    Ok(self)
   }
 
   /// Set the error tolerance for this solver
-  pub fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> &mut RungeKuttaFehlbergBuilder<N> {
+  pub fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
     if !tol.is_sign_positive() {
-      panic!("tolerance must be positive");
+      return Err("RungeKuttaFehlbergBuilder: tolerance must be positive".to_owned());
     }
     self.solver.tolerance = tol;
-    self
+    Ok(self)
   }
 }
 
@@ -437,7 +440,7 @@ impl<N: ComplexField+From<f64>+Copy> RungeKuttaSolver for RungeKuttaFehlberg<N> 
     }
 
     if self.dt < self.dt_min {
-      Err("Mininum dt exceeded".to_owned())
+      Err("RungeKuttaFehlberg: Mininum dt exceeded".to_owned())
     } else {
       Ok(error <= self.tolerance)
     }
