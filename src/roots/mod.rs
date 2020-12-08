@@ -1,5 +1,31 @@
 use nalgebra::DVector;
 
+/// Use the bisection method to solve for a zero of an equation.
+///
+/// This function takes an interval and uses a binary search to find
+/// where in that interval a function has a root. The signs of the function
+/// at each end of the interval must be different
+///
+/// # Returns
+/// Ok(root) when a root has been found, Err on failure
+///
+/// # Params
+/// `(left, right)` The starting interval. f(left) * f(right) > 0.0
+///
+/// `f` The function to find the root for
+///
+/// `tol` The tolerance of the relative error between iterations.
+///
+/// `n_max` The maximum number of iterations to use.
+///
+/// # Examples
+/// ```
+/// fn cubic(x: f64) -> f64 {
+///   x*x*x
+/// }
+/// ...
+/// let solution = roots::bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
+/// ```
 pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64, n_max: usize) -> Result<f64, String> {
   if left >= right {
     return Err("requirement: right > left".to_owned());
@@ -8,6 +34,9 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
   let mut n = 1;
 
   let mut f_a = f(left);
+  if f_a * f(right) > 0.0 {
+    return Err("requirement: Signs must be different".to_owned());
+  }
 
   if f_a * f(right) > 0.0 {
     return Err("sgn(f(a)) != sgn(f(b))".to_owned());
@@ -44,6 +73,39 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
   Err("Maximum iterations exceeded".to_owned())
 }
 
+/// Use Newton's method to find a root of a vector function.
+///
+/// Using a vector function and its derivative, find a root based on an initial guess
+/// using Newton's method.
+///
+/// # Returns
+/// `Ok(vec)` on success, where `vec` is a vector input for which the function is
+/// zero. `Err` on failure.
+///
+/// # Params
+/// `initial` Initial guess of the root. Should be near actual root. Slice since this
+/// function finds roots of vector functions.
+///
+/// `f` Vector function for which to find the root
+///
+/// `f_deriv` Derivative of `f`
+///
+/// `tol` tolerance for error between iterations of Newton's method
+///
+/// `n_max` Maximum number of iterations
+///
+/// # Examples
+/// ```
+/// fn cubic(x: &[f64]) -> DVector<f64> {
+///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
+/// }
+///
+/// fn cubic_deriv(x: &[f64]) -> DVector<f64> {
+///   DVector::from_iterator(x.len(), x.iter.map(|x| 3.0*x.powi(2)))
+/// }
+/// ...
+/// let solution = roots::newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
+/// ```
 pub fn newton(
   initial: &[f64],
   f: fn(&[f64]) -> DVector<f64>,
@@ -80,6 +142,33 @@ pub fn newton(
   Err("Maximum iterations exceeded".to_owned())
 }
 
+/// Use secant method to find a root of a vector function.
+///
+/// Using a vector function and its derivative, find a root based on two initial guesses
+/// using secant method.
+///
+/// # Returns
+/// `Ok(vec)` on success, where `vec` is a vector input for which the function is
+/// zero. `Err` on failure.
+///
+/// # Params
+/// `initial` Initial guesses of the root. Should be near actual root. Slice since this
+/// function finds roots of vector functions.
+///
+/// `f` Vector function for which to find the root
+///
+/// `tol` tolerance for error between iterations of Newton's method
+///
+/// `n_max` Maximum number of iterations
+///
+/// # Examples
+/// ```
+/// fn cubic(x: &[f64]) -> DVector<f64> {
+///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
+/// }
+/// ...
+/// let solution = roots::secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
+/// ```
 pub fn secant(
   initial: (&[f64], &[f64]),
   f: fn(&[f64]) -> DVector<f64>,
