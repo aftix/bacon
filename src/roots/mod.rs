@@ -7,6 +7,9 @@
 use nalgebra::{DVector};
 use alga::general::{ComplexField,RealField};
 
+mod polynomial;
+pub use polynomial::*;
+
 /// Use the bisection method to solve for a zero of an equation.
 ///
 /// This function takes an interval and uses a binary search to find
@@ -225,6 +228,7 @@ pub fn newton<N: RealField, M: ComplexField+Into<N>>(
 /// `n_max` Maximum number of iterations
 ///
 /// # Examples
+///
 /// ```
 /// use nalgebra::DVector;
 /// use bacon::roots::secant;
@@ -278,3 +282,5 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
 
   Err("Secant: Maximum iterations exceeded".to_owned())
 }
+
+

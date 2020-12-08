@@ -8,6 +8,8 @@ use crate::roots;
 use std::f64;
 use nalgebra::DVector;
 
+mod polynomial;
+
 fn cubic(x: f64) -> f64 {
   x*x*x
 }
