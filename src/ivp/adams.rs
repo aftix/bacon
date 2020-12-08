@@ -88,12 +88,16 @@ pub trait AdamsSolver {
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::ivp::{AdamsBashforth,adams};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_iterator(y.len(), y.iter())
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let adam = AdamsBashforth::default().with_dt(0.01).build();
-/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// //...
+/// fn example() {
+///   let adam = AdamsBashforth::default().with_dt(0.01).build();
+///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 pub fn adams<T: Clone, S: AdamsSolver>(
   mut solver: S,
@@ -274,12 +278,16 @@ pub fn adams<T: Clone, S: AdamsSolver>(
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::ivp::{adams,AdamsBashforth};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_iterator(y.len(), y.iter())
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let adam = AdamsBashforth::default().with_dt(0.01).build();
-/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// ///...
+/// fn example() {
+///   let adam = AdamsBashforth::default().with_dt(0.01).build();
+///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
@@ -328,17 +336,20 @@ impl AdamsSolver for AdamsBashforth {
   }
 }
 
-// Fourth order adams predictor corrector
 /// Fourth order predictor-corrector solver
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::ivp::{adams,PredictorCorrector};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_iterator(y.len(), y.iter())
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let adam = PredictorCorrector::default().with_dt_max(0.01).with_dt_min(0.0001).tolerance(0.001).build();
-/// let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// //...
+/// fn example() {
+///   let adam = PredictorCorrector::default().with_dt_max(0.01).with_dt_min(0.0001).with_tolerance(0.001).build();
+///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]

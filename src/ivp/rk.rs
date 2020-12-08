@@ -83,12 +83,17 @@ pub trait RungeKuttaSolver {
 /// # Examples
 ///
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::ivp::{RungeKutta, runge_kutta};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_iterator(y.len(), y.iter())
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let rk = RungeKutta::default().with_dt(0.01).build();
-/// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+///
+/// //...
+/// fn example() {
+///   let rk = RungeKutta::default().with_dt(0.01).build();
+///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
   mut solver: S,
@@ -156,12 +161,16 @@ pub fn runge_kutta<T: Clone, S: RungeKuttaSolver>(
 ///
 /// # Examples
 /// ```
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
-///   DVector::from_iterator(y.len(), y.iter())
+/// use nalgebra::DVector;
+/// use bacon::ivp::{RungeKutta, runge_kutta};
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let rk = RungeKutta::default().with_dt(0.01).build();
-/// let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// //...
+/// fn example() {
+///   let rk = RungeKutta::default().with_dt(0.01).build();
+///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
@@ -230,12 +239,16 @@ impl RungeKuttaSolver for RungeKutta {
 ///
 /// # Examples
 /// ```
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) {
-///   DVector::from_iterator(y.len(), y.iter())
+/// use nalgebra::DVector;
+/// use bacon::ivp::{runge_kutta, RungeKuttaFehlberg};
+/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.01).build();
-/// let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// //...
+/// fn example() {
+///   let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001).with_dt_max(0.01).with_tolerance(0.01).build();
+///   let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ());
+/// }
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]

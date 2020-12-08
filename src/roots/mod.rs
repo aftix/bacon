@@ -5,6 +5,7 @@
  */
 
 use nalgebra::DVector;
+use num_traits::{Float, NumCast, Zero};
 
 /// Use the bisection method to solve for a zero of an equation.
 ///
@@ -26,13 +27,19 @@ use nalgebra::DVector;
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::roots::bisection;
+///
 /// fn cubic(x: f64) -> f64 {
 ///   x*x*x
 /// }
-/// ...
-/// let solution = roots::bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
+/// //...
+/// fn example() {
+///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
+/// }
 /// ```
-pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64, n_max: usize) -> Result<f64, String> {
+pub fn bisection<N: Float+NumCast+Zero>((mut left, mut right): (N, N), f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
+{
   if left >= right {
     return Err("requirement: right > left".to_owned());
   }
@@ -40,31 +47,31 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
   let mut n = 1;
 
   let mut f_a = f(left);
-  if f_a * f(right) > 0.0 {
+  if f_a * f(right) > Zero::zero() {
     return Err("requirement: Signs must be different".to_owned());
   }
 
-  if f_a * f(right) > 0.0 {
+  if f_a * f(right) > Zero::zero() {
     return Err("sgn(f(a)) != sgn(f(b))".to_owned());
   }
 
-  let mut half_interval = (left - right) * 0.5;
+  let mut half_interval = (left - right) * N::from(0.5f64).unwrap();
   let mut middle = left + half_interval;
 
-  if approx_eq!(f64, 0.0, middle, epsilon = tol) {
+  if middle.abs() <= tol {
     return Ok(middle);
   }
 
   while n <= n_max {
     let f_p = f(middle);
-    if f_p * f_a > 0.0 {
+    if f_p * f_a > Zero::zero() {
       left = middle;
       f_a = f_p;
     } else {
       right = middle;
     }
 
-    half_interval = (right - left) * 0.5;
+    half_interval = (right - left) * N::from(0.5f64).unwrap();
 
     let middle_new = left + half_interval;
 
@@ -102,15 +109,19 @@ pub fn bisection((mut left, mut right): (f64, f64), f: fn(f64) -> f64, tol: f64,
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::roots::newton;
 /// fn cubic(x: &[f64]) -> DVector<f64> {
 ///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
 /// }
 ///
 /// fn cubic_deriv(x: &[f64]) -> DVector<f64> {
-///   DVector::from_iterator(x.len(), x.iter.map(|x| 3.0*x.powi(2)))
+///   DVector::from_iterator(x.len(), x.iter().map(|x| 3.0*x.powi(2)))
 /// }
-/// ...
-/// let solution = roots::newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
+/// //...
+/// fn example() {
+///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
+/// }
 /// ```
 pub fn newton(
   initial: &[f64],
@@ -169,11 +180,15 @@ pub fn newton(
 ///
 /// # Examples
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::roots::secant;
 /// fn cubic(x: &[f64]) -> DVector<f64> {
 ///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
 /// }
-/// ...
-/// let solution = roots::secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
+/// //...
+/// fn example() {
+///   let solution = secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
+/// }
 /// ```
 pub fn secant(
   initial: (&[f64], &[f64]),

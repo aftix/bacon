@@ -35,12 +35,16 @@ pub use adams::*;
 /// # Example
 ///
 /// ```
+/// use nalgebra::DVector;
+/// use bacon::ivp::euler;
 /// // Derivative of y_i = exp(y_i)
 /// fn derivative(_t: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
-///   DVector::from_iterator(y.len(), y.iter())
+///   DVector::from_column_slice(y)
 /// }
-/// ...
-/// let path = euler((0.0, 1.0), &[1.0], 0.01, derivative, &mut ());
+/// //...
+/// fn example() {
+///   let path = euler((0.0, 1.0), &[1.0], 0.01, derivative, &mut ());
+/// }
 /// ```
 pub fn euler<T>(
   (t_initial, t_final): (f64, f64),
