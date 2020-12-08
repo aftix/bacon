@@ -6,6 +6,7 @@
 
 use nalgebra::DVector;
 use std::collections::VecDeque;
+use alga::general::{ComplexField, RealField};
 
 /// This trait allows a struct to be used in the Adams-Bashforth/Predictor-corrector solver.
 ///
@@ -13,12 +14,14 @@ use std::collections::VecDeque;
 /// See `struct AdamsBashforth` and `struct PredictorCorrector` for examples of
 /// implementing this trait.
 pub trait AdamsSolver {
+  type Complex: ComplexField+From<f64>;
+
   /// Returns a slice of coefficients to weight the previous
   /// steps of the explicit solver with. The length of the slice
   /// is the order of the predictor.
   /// The first element is the weight of the n-1 step,
   /// the next is the n-2 step, etc.
-  fn predictor_coefficients() -> &'static [f64];
+  fn predictor_coefficients() -> Vec<<Self::Complex as ComplexField>::RealField>;
 
   /// Returns a slice of coefficients to weight the
   /// previous steps of the implicit solver with. The length
@@ -26,8 +29,8 @@ pub trait AdamsSolver {
   /// The length must be at most 1 more than the predictor
   /// coefficients (so if the predictor uses previous function
   /// evaluations up to n-k then the corrector can only use up to n-k).
-  fn corrector_coefficients() -> &'static [f64] {
-    &[]
+  fn corrector_coefficients() -> Vec<<Self::Complex as ComplexField>::RealField> {
+    vec![]
   }
 
   /// Returns true if this is an adaptive predictor-corrector method.
@@ -37,9 +40,8 @@ pub trait AdamsSolver {
   }
 
   /// Returns the current timestep
-  fn dt(&self) -> f64;
+  fn dt(&self) -> <Self::Complex as ComplexField>::RealField;
 
-  // 0 = fail, 1 = pass with no update, 2 = pass with update
   /// For predictor-correctors, update the current timestep based on the error.
   ///
   /// # Return
@@ -47,17 +49,18 @@ pub trait AdamsSolver {
   /// passed with no update to dt, and Ok(2) if the last step passed
   /// with an update to dt. Returns Err if the timestep goes under the
   /// minimum timestep specified.
-  fn update_dt(&mut self, _error: f64) -> Result<u8, String> {
+  fn update_dt(&mut self, _error: <Self::Complex as ComplexField>::RealField) -> Result<u8, String> {
     Ok(1)
   }
 
   /// For predictor-corrector methods, the value to weight the error by.
-  fn error_coefficient() -> f64 {
-    0.0
+  fn error_coefficient() -> <Self::Complex as ComplexField>::RealField {
+    Self::Complex::from(0.0).real()
   }
 }
 
-// Use an adams method to solve an IVP
+type DerivativeFunc<Complex, Real, T> = fn(Real, &[Complex], &mut T) -> DVector<Complex>;
+type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 /// Use an Adams-Bashforth method or an
 /// Adams-Bashforth/Adams-Moulton predictor-corrector to solve an IVP
 ///
@@ -99,24 +102,27 @@ pub trait AdamsSolver {
 ///   let path = adams(adam, (0.0, 1.0), &[1.0], derivatives, &mut ());
 /// }
 /// ```
-pub fn adams<T: Clone, S: AdamsSolver>(
+pub fn adams<S: AdamsSolver, T: Clone>(
   mut solver: S,
-  (t_initial, t_final): (f64,f64),
-  y_0: &[f64],
-  derivs: fn(f64, &[f64], &mut T) -> DVector<f64>,
+  (t_initial, t_final): (<S::Complex as ComplexField>::RealField,<S::Complex as ComplexField>::RealField),
+  y_0: &[S::Complex],
+  derivs: DerivativeFunc<S::Complex, <S::Complex as ComplexField>::RealField, T>,
   params: &mut T
-) -> Result<Vec<(f64, DVector<f64>)>, String> {
+) -> ReturnType<S::Complex, <S::Complex as ComplexField>::RealField> {
   let state = DVector::from_column_slice(y_0);
   let mut path = vec![(t_initial, state)];
 
   let mut params_considering = params.clone();
 
-  let mut considering: VecDeque<(f64, DVector<f64>)> = VecDeque::with_capacity(S::predictor_coefficients().len());
+  let mut considering = VecDeque::with_capacity(S::predictor_coefficients().len());
 
-  let rk = super::RungeKutta::default().with_dt(solver.dt()).build();
+  let rk = super::RungeKutta::<S::Complex>::default().with_dt(solver.dt()).build();
   let initial = super::runge_kutta(
       rk,
-      (t_initial, t_initial + S::predictor_coefficients().len() as f64 * solver.dt()),
+      (
+        t_initial,
+        t_initial + S::Complex::from(S::predictor_coefficients().len() as f64).real() * solver.dt()
+      ),
       y_0,
       derivs,
       params
@@ -128,7 +134,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
     considering.pop_front();
   }
 
-  let mut memory: VecDeque<DVector<f64>> = VecDeque::with_capacity(considering.len());
+  let mut memory = VecDeque::with_capacity(considering.len());
   for (i, state) in considering.iter().enumerate() {
     if i == 0 {
       memory.push_back(derivs(state.0, y_0, &mut params_considering));
@@ -151,7 +157,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
   'out: loop {
     let mut predictor = considering.back().unwrap().1.clone();
     for i in 0..considering.len() {
-      predictor += solver.dt() * &memory[considering.len() - i - 1] * S::predictor_coefficients()[i];
+      predictor += &memory[considering.len() - i - 1] * S::Complex::from_real(S::predictor_coefficients()[i] *solver.dt());
     }
 
     let implicit = derivs(time + solver.dt(), predictor.column(0).as_slice(), &mut params_considering);
@@ -159,11 +165,12 @@ pub fn adams<T: Clone, S: AdamsSolver>(
     if S::predictor_corrector() {
       let mut corrector = considering.back().unwrap().1.clone();
       for i in 0..considering.len() {
-        corrector += solver.dt() * &memory[considering.len() - i - 1] * S::corrector_coefficients()[i+1];
+        corrector += &memory[considering.len() - i - 1] * S::Complex::from_real(S::corrector_coefficients()[i+1] * solver.dt());
       }
-      corrector += solver.dt() * &implicit * S::corrector_coefficients()[0];
+      corrector += &implicit * S::Complex::from_real(S::corrector_coefficients()[0] * solver.dt());
 
-      let error = (&corrector - &predictor).norm() * S::error_coefficient() / solver.dt();
+      let error = &corrector - &predictor;
+      let error = error.dot(&error).real().sqrt() * S::error_coefficient() / solver.dt();
 
       let dt_old = solver.dt();
       let result = solver.update_dt(error)?;
@@ -185,9 +192,9 @@ pub fn adams<T: Clone, S: AdamsSolver>(
         }
         if result == 2 || time + dt_old > t_final {
           let mut dt_old = solver.dt();
-          if time + 4.0*dt_old > t_final {
+          if time + S::Complex::from(4.0).real()*dt_old > t_final {
             last = true;
-            dt_old = (t_final - time) / (4.0 * dt_old);
+            dt_old = (t_final - time) / (S::Complex::from(4.0).real() * dt_old);
           }
 
           considering.clear();
@@ -196,7 +203,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
           let rk = super::RungeKutta::default().with_dt(dt_old).build();
           let initial = super::runge_kutta(
               rk,
-              (time, time + S::predictor_coefficients().len() as f64 * dt_old),
+              (time, time + S::Complex::from(S::predictor_coefficients().len() as f64).real() * dt_old),
               y_0,
               derivs,
               params
@@ -225,7 +232,7 @@ pub fn adams<T: Clone, S: AdamsSolver>(
         let rk = super::RungeKutta::default().with_dt(solver.dt()).build();
         let initial = super::runge_kutta(
             rk,
-            (time, time + S::predictor_coefficients().len() as f64 * solver.dt()),
+            (time, time + S::Complex::from(S::predictor_coefficients().len() as f64).real() * solver.dt()),
             y_0,
             derivs,
             params
@@ -291,47 +298,54 @@ pub fn adams<T: Clone, S: AdamsSolver>(
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
-pub struct AdamsBashforth {
-  dt: f64,
+pub struct AdamsBashforth<N: ComplexField+From<f64>+Copy> {
+  dt: <N as ComplexField>::RealField,
 }
 
 /// Builds an AdamsBashforth
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
-pub struct AdamsBashforthBuilder {
-  solver: AdamsBashforth,
+pub struct AdamsBashforthBuilder<N: ComplexField+From<f64>+Copy> {
+  solver: AdamsBashforth<N>,
 }
 
-impl AdamsBashforth {
+impl<N: ComplexField+From<f64>+Copy> AdamsBashforth<N> {
   /// Get a builder to make an AdamsBashforth solver
-  pub fn default() -> AdamsBashforthBuilder {
+  pub fn default() -> AdamsBashforthBuilder<N> {
     AdamsBashforthBuilder {
       solver: AdamsBashforth{
-        dt: 0.01,
+        dt: N::from(0.01).real(),
       },
     }
   }
 }
 
-impl AdamsBashforthBuilder {
+impl<N: ComplexField+From<f64>+Copy> AdamsBashforthBuilder<N> {
   /// Make an AdamsBashforth solver
-  pub fn build(self) -> AdamsBashforth {
+  pub fn build(self) -> AdamsBashforth<N> {
     self.solver
   }
 
   /// Set the timestep for this solver
-  pub fn with_dt(&mut self, dt: f64) -> &mut AdamsBashforthBuilder {
+  pub fn with_dt(&mut self, dt: <N as ComplexField>::RealField) -> &mut AdamsBashforthBuilder<N> {
     self.solver.dt = dt;
     self
   }
 }
 
-impl AdamsSolver for AdamsBashforth {
-  fn predictor_coefficients() -> &'static [f64] {
-    &[55.0/24.0, -59.0/24.0, 37.0/24.0, -9.0/24.0]
+impl<N: ComplexField+From<f64>+Copy> AdamsSolver for AdamsBashforth<N> {
+  type Complex = N;
+
+  fn predictor_coefficients() -> Vec<<N as ComplexField>::RealField> {
+    vec![
+      N::from(55.0/24.0).real(),
+      N::from(-59.0/24.0).real(),
+      N::from(37.0/24.0).real(),
+      N::from(-9.0/24.0).real(),
+    ]
   }
 
-  fn dt(&self) -> f64 {
+  fn dt(&self) -> <N as ComplexField>::RealField {
     self.dt
   }
 }
@@ -353,37 +367,37 @@ impl AdamsSolver for AdamsBashforth {
 /// ```
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
-pub struct PredictorCorrector {
-  dt: f64,
-  dt_max: f64,
-  dt_min: f64,
-  tolerance: f64
+pub struct PredictorCorrector<N: ComplexField+From<f64>+Copy> {
+  dt: <N as ComplexField>::RealField,
+  dt_max: <N as ComplexField>::RealField,
+  dt_min: <N as ComplexField>::RealField,
+  tolerance: <N as ComplexField>::RealField,
 }
 
 /// Builder for a PredictorCorrector solver
 #[derive(Debug,Copy,Clone)]
 #[cfg_attr(feature="serialize",derive(Serialize,Deserialize))]
-pub struct PredictorCorrectorBuilder {
-  solver: PredictorCorrector
+pub struct PredictorCorrectorBuilder<N: ComplexField+From<f64>+Copy> {
+  solver: PredictorCorrector<N>
 }
 
-impl PredictorCorrector {
+impl<N: ComplexField+From<f64>+Copy> PredictorCorrector<N> {
   /// Make a builder to get a PredictorCorrector solver
-  pub fn default() -> PredictorCorrectorBuilder {
+  pub fn default() -> PredictorCorrectorBuilder<N> {
     PredictorCorrectorBuilder {
       solver: PredictorCorrector {
-        dt: 0.01,
-        dt_min: 0.01,
-        dt_max: 0.1,
-        tolerance: 0.005,
+        dt: N::from(0.01).real(),
+        dt_min: N::from(0.01).real(),
+        dt_max: N::from(0.1).real(),
+        tolerance: N::from(0.005).real(),
       }
     }
   }
 }
 
-impl PredictorCorrectorBuilder {
+impl<N: ComplexField+From<f64>+Copy> PredictorCorrectorBuilder<N> {
   /// Get a PredictorCorrector solver
-  pub fn build(mut self) -> PredictorCorrector {
+  pub fn build(mut self) -> PredictorCorrector<N> {
     if self.solver.dt_min >= self.solver.dt_max {
       panic!("dt_min must be <= dt_max");
     }
@@ -392,8 +406,8 @@ impl PredictorCorrectorBuilder {
   }
 
   /// Set the minimum timestep for this solver
-  pub fn with_dt_min(&mut self, dt_min: f64) -> &mut PredictorCorrectorBuilder {
-    if dt_min <= 0.0 {
+  pub fn with_dt_min(&mut self, dt_min: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+    if !dt_min.is_sign_positive() {
       panic!("dt_min must be positive");
     }
     self.solver.dt_min = dt_min;
@@ -401,8 +415,8 @@ impl PredictorCorrectorBuilder {
   }
 
   /// Set the maximum timestep for this solver
-  pub fn with_dt_max(&mut self, dt_max: f64) -> &mut PredictorCorrectorBuilder {
-    if dt_max <= 0.0 {
+  pub fn with_dt_max(&mut self, dt_max: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+    if !dt_max.is_sign_positive() {
       panic!("dt_max must be positive");
     }
     self.solver.dt_max = dt_max;
@@ -410,8 +424,8 @@ impl PredictorCorrectorBuilder {
   }
 
   /// Set the error tolerance for this solver
-  pub fn with_tolerance(&mut self, tol: f64) -> &mut PredictorCorrectorBuilder {
-    if tol <= 0.0 {
+  pub fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> &mut PredictorCorrectorBuilder<N> {
+    if !tol.is_sign_positive() {
       panic!("tolerance must be positive");
     }
     self.solver.tolerance = tol;
@@ -419,28 +433,41 @@ impl PredictorCorrectorBuilder {
   }
 }
 
-impl AdamsSolver for PredictorCorrector {
-  fn predictor_coefficients() -> &'static [f64] {
-    &[55.0/24.0, -59.0/24.0, 37.0/24.0, -9.0/24.0]
+impl<N: ComplexField+From<f64>+Copy> AdamsSolver for PredictorCorrector<N> {
+  type Complex = N;
+
+  fn predictor_coefficients() -> Vec<<N as ComplexField>::RealField> {
+    vec![
+      N::from(55.0/24.0).real(),
+      N::from(-59.0/24.0).real(),
+      N::from(37.0/24.0).real(),
+      N::from(-9.0/24.0).real(),
+    ]
   }
 
-  fn dt(&self) -> f64 {
+  fn dt(&self) -> <N as ComplexField>::RealField {
     self.dt
   }
 
-  fn corrector_coefficients() -> &'static [f64] {
-    &[9.0/24.0, 19.0/24.0, -5.0/24.0, 1.0/24.0, 0.0]
+  fn corrector_coefficients() -> Vec<<N as ComplexField>::RealField> {
+    vec![
+      N::from(9.0/24.0).real(),
+      N::from(19.0/24.0).real(),
+      N::from(-5.0/24.0).real(),
+      N::from(1.0/24.0).real(),
+      N::from(0.0).real(),
+    ]
   }
 
-  fn error_coefficient() -> f64 {
-    19.0/270.0
+  fn error_coefficient() -> <N as ComplexField>::RealField {
+    N::from(19.0/270.0).real()
   }
 
-  fn update_dt(&mut self, error: f64) -> Result<u8, String> {
+  fn update_dt(&mut self, error: <N as ComplexField>::RealField) -> Result<u8, String> {
     if error > self.tolerance {
-      let q = (self.tolerance/(2.0*error)).powf(0.25);
-      if q <= 0.1 {
-        self.dt *= 0.1;
+      let q = (self.tolerance/(N::from(2.0).real()*error)).powf(N::from(0.25).real());
+      if q <= N::from(0.1).real() {
+        self.dt *= N::from(0.1).real();
       } else {
         self.dt *= q;
       }
@@ -452,10 +479,10 @@ impl AdamsSolver for PredictorCorrector {
       return Ok(0);
     }
 
-    if error < 0.1 * self.tolerance {
-      let q = (self.tolerance/(2.0*error)).powf(0.25);
-      if q >= 4.0 {
-        self.dt *= 4.0;
+    if error < N::from(0.1).real() * self.tolerance {
+      let q = (self.tolerance/(N::from(2.0).real()*error)).powf(N::from(0.25).real());
+      if q >= N::from(4.0).real() {
+        self.dt *= N::from(4.0).real();
       } else {
         self.dt *= q;
       }
