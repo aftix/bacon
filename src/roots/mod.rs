@@ -41,14 +41,14 @@ use alga::general::{ComplexField,RealField};
 pub fn bisection<N: RealField+From<f64>>((mut left, mut right): (N, N), f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
 {
   if left >= right {
-    return Err("requirement: right > left".to_owned());
+    return Err("Bisection: requirement: right > left".to_owned());
   }
 
   let mut n = 1;
 
   let mut f_a = f(left);
   if (f_a * f(right)).is_sign_positive() {
-    return Err("requirement: Signs must be different".to_owned());
+    return Err("Bisection: requirement: Signs must be different".to_owned());
   }
 
   let mut half_interval = (left - right) * N::from(0.5);
@@ -79,7 +79,57 @@ pub fn bisection<N: RealField+From<f64>>((mut left, mut right): (N, N), f: fn(N)
     n += 1;
   }
 
-  Err("Maximum iterations exceeded".to_owned())
+  Err("Bisection: Maximum iterations exceeded".to_owned())
+}
+
+/// Use steffenson's method to find a fixed point
+///
+/// Use steffenson's method to find a value x so that f(x) = x, given
+/// a starting point.
+///
+/// # Returns
+/// `Ok(x)` so that `f(x) - x < tol` on success, `Err` on failure
+///
+/// # Params
+/// `initial` inital guess for the fixed point
+///
+/// `f` Function to find the fixed point of
+///
+/// `tol` Tolerance from 0 to try and achieve
+///
+/// `n_max` maximum number of iterations
+///
+/// # Examples
+/// ```
+/// use bacon::roots::steffensen;
+/// fn cosine(x: f64) -> f64 {
+///   x.cos()
+/// }
+/// //...
+/// fn example() -> Result<(), String> {
+///   let solution = steffensen(0.5f64, cosine, 0.0001, 1000)?;
+///   Ok(())
+/// }
+pub fn steffensen<N: RealField+From<f64>+Copy>(
+  mut initial: N,
+  f: fn(N) -> N,
+  tol: N,
+  n_max: usize
+) -> Result<N, String> {
+  let mut n = 0;
+
+  while n < n_max {
+    let guess = f(initial);
+    let new_guess = f(guess);
+    let diff = initial - (guess - initial).powi(2)/(new_guess - N::from(2.0)*guess + initial);
+    if (diff - initial).abs() <= tol {
+      return Ok(diff);
+    }
+    initial = diff;
+    n += 1;
+  }
+
+  Err("Steffensen: Maximum number of iterations exceeded".to_owned())
 }
 
 /// Use Newton's method to find a root of a vector function.
@@ -152,7 +202,7 @@ pub fn newton<N: RealField, M: ComplexField+Into<N>>(
     n += 1;
   }
 
-  Err("Maximum iterations exceeded".to_owned())
+  Err("Newton: Maximum iterations exceeded".to_owned())
 }
 
 /// Use secant method to find a root of a vector function.
@@ -226,5 +276,5 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
     n += 1;
   }
 
-  Err("Maximum iterations exceeded".to_owned())
+  Err("Secant: Maximum iterations exceeded".to_owned())
 }

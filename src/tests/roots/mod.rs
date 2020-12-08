@@ -20,6 +20,18 @@ fn exp_xsq(x: f64) -> f64 {
   x.exp() - x*x
 }
 
+fn exp_sqrt(x: f64) -> f64 {
+  -x.exp().sqrt()
+}
+
+fn cosine(x: f64) -> f64 {
+  x.cos()
+}
+
+fn poly(x: f64) -> f64 {
+  (10.0 / (x + 4.0)).sqrt()
+}
+
 // Solve x^n = exp(x) where n is 2+index (since x = exp(x) has no solution)
 fn exp_newton(x: &[f64]) -> DVector<f64> {
   DVector::from_iterator(x.len(), x.iter().enumerate().map(|(i, x)| x.exp() - x.powi(i as i32 + 2)))
@@ -103,4 +115,22 @@ fn secant_cos() {
   let tol = 0.0001;
   let solution = roots::secant((&start_1, &start_2), cos_secant, tol, 1000).unwrap();
   assert!(approx_eq!(f64, *solution.get(0).unwrap(), 0.739085, epsilon=0.000001));
+}
+
+#[test]
+fn steffensen_exp() {
+  let solution = roots::steffensen(-0.7f64, exp_sqrt, 0.0001, 1000).unwrap();
+  assert!(approx_eq!(f64, solution, -0.703467, epsilon=0.000001));
+}
+
+#[test]
+fn steffensen_cos() {
+  let solution = roots::steffensen(0.8f64, cosine, 0.0001, 1000).unwrap();
+  assert!(approx_eq!(f64, solution, 0.739085, epsilon=0.000001));
+}
+
+#[test]
+fn steffenson_poly() {
+  let solution = roots::steffensen(1.2f64, poly, 0.0001, 1000).unwrap();
+  assert!(approx_eq!(f64, solution, 1.3652, epsilon=0.0001));
 }
