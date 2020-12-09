@@ -4,13 +4,13 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{DVector};
 use alga::general::{ComplexField, RealField};
+use nalgebra::DVector;
 
-pub mod rk;
 pub mod adams;
-pub use rk::*;
+pub mod rk;
 pub use adams::*;
+pub use rk::*;
 
 /// Solves an initial value problem using euler's method. Don't use this.
 ///
@@ -47,24 +47,24 @@ pub use adams::*;
 ///   let path = euler((0.0, 1.0), &[1.0], 0.01, derivative, &mut ());
 /// }
 /// ```
-pub fn euler<N: RealField, M: ComplexField+From<N>, T>(
-  (t_initial, t_final): (N, N),
-  y_0: &[M],
-  dt: N,
-  derivs: fn(N, &[M], &mut T) -> DVector<M>,
-  params: &mut T
+pub fn euler<N: RealField, M: ComplexField + From<N>, T>(
+    (t_initial, t_final): (N, N),
+    y_0: &[M],
+    dt: N,
+    derivs: fn(N, &[M], &mut T) -> DVector<M>,
+    params: &mut T,
 ) -> Vec<(N, DVector<M>)> {
-  let mut state = DVector::from_column_slice(y_0);
-  let mut path = vec![(t_initial, state.clone())];
+    let mut state = DVector::from_column_slice(y_0);
+    let mut path = vec![(t_initial, state.clone())];
 
-  let mut time = t_initial;
+    let mut time = t_initial;
 
-  while time < t_final {
-    let f = derivs(time, state.column(0).as_slice(), params);
-    state += f * M::from(dt);
-    time += dt;
-    path.push((time, state.clone()));
-  }
+    while time < t_final {
+        let f = derivs(time, state.column(0).as_slice(), params);
+        state += f * M::from(dt);
+        time += dt;
+        path.push((time, state.clone()));
+    }
 
-  path
+    path
 }

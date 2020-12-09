@@ -4,8 +4,8 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{DVector};
-use alga::general::{ComplexField,RealField};
+use alga::general::{ComplexField, RealField};
+use nalgebra::DVector;
 
 mod polynomial;
 pub use polynomial::*;
@@ -41,48 +41,52 @@ pub use polynomial::*;
 ///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn bisection<N: RealField>((mut left, mut right): (N, N), f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
-{
-  if left >= right {
-    return Err("Bisection: requirement: right > left".to_owned());
-  }
-
-  let mut n = 1;
-
-  let mut f_a = f(left);
-  if (f_a * f(right)).is_sign_positive() {
-    return Err("Bisection: requirement: Signs must be different".to_owned());
-  }
-
-  let mut half_interval = (left - right) * N::from_f64(0.5).unwrap();
-  let mut middle = left + half_interval;
-
-  if middle.abs() <= tol {
-    return Ok(middle);
-  }
-
-  while n <= n_max {
-    let f_p = f(middle);
-    if (f_p * f_a).is_sign_positive() {
-      left = middle;
-      f_a = f_p;
-    } else {
-      right = middle;
+pub fn bisection<N: RealField>(
+    (mut left, mut right): (N, N),
+    f: fn(N) -> N,
+    tol: N,
+    n_max: usize,
+) -> Result<N, String> {
+    if left >= right {
+        return Err("Bisection: requirement: right > left".to_owned());
     }
 
-    half_interval = (right - left) * N::from_f64(0.5).unwrap();
+    let mut n = 1;
 
-    let middle_new = left + half_interval;
-
-    if (middle - middle_new).abs() / middle.abs() < tol || middle_new.abs() < tol {
-      return Ok(middle_new);
+    let mut f_a = f(left);
+    if (f_a * f(right)).is_sign_positive() {
+        return Err("Bisection: requirement: Signs must be different".to_owned());
     }
 
-    middle = middle_new;
-    n += 1;
-  }
+    let mut half_interval = (left - right) * N::from_f64(0.5).unwrap();
+    let mut middle = left + half_interval;
 
-  Err("Bisection: Maximum iterations exceeded".to_owned())
+    if middle.abs() <= tol {
+        return Ok(middle);
+    }
+
+    while n <= n_max {
+        let f_p = f(middle);
+        if (f_p * f_a).is_sign_positive() {
+            left = middle;
+            f_a = f_p;
+        } else {
+            right = middle;
+        }
+
+        half_interval = (right - left) * N::from_f64(0.5).unwrap();
+
+        let middle_new = left + half_interval;
+
+        if (middle - middle_new).abs() / middle.abs() < tol || middle_new.abs() < tol {
+            return Ok(middle_new);
+        }
+
+        middle = middle_new;
+        n += 1;
+    }
+
+    Err("Bisection: Maximum iterations exceeded".to_owned())
 }
 
 /// Use steffenson's method to find a fixed point
@@ -113,26 +117,27 @@ pub fn bisection<N: RealField>((mut left, mut right): (N, N), f: fn(N) -> N, tol
 ///   let solution = steffensen(0.5f64, cosine, 0.0001, 1000)?;
 ///   Ok(())
 /// }
-pub fn steffensen<N: RealField+From<f64>+Copy>(
-  mut initial: N,
-  f: fn(N) -> N,
-  tol: N,
-  n_max: usize
+pub fn steffensen<N: RealField + From<f64> + Copy>(
+    mut initial: N,
+    f: fn(N) -> N,
+    tol: N,
+    n_max: usize,
 ) -> Result<N, String> {
-  let mut n = 0;
+    let mut n = 0;
 
-  while n < n_max {
-    let guess = f(initial);
-    let new_guess = f(guess);
-    let diff = initial - (guess - initial).powi(2)/(new_guess - N::from(2.0)*guess + initial);
-    if (diff - initial).abs() <= tol {
-      return Ok(diff);
+    while n < n_max {
+        let guess = f(initial);
+        let new_guess = f(guess);
+        let diff =
+            initial - (guess - initial).powi(2) / (new_guess - N::from(2.0) * guess + initial);
+        if (diff - initial).abs() <= tol {
+            return Ok(diff);
+        }
+        initial = diff;
+        n += 1;
     }
-    initial = diff;
-    n += 1;
-  }
 
-  Err("Steffensen: Maximum number of iterations exceeded".to_owned())
+    Err("Steffensen: Maximum number of iterations exceeded".to_owned())
 }
 
 /// Use Newton's method to find a root of a vector function.
@@ -173,39 +178,43 @@ pub fn steffensen<N: RealField+From<f64>+Copy>(
 /// }
 /// ```
 pub fn newton<N: ComplexField>(
-  initial: &[N],
-  f: fn(&[N]) -> DVector<N>,
-  f_deriv: fn(&[N]) -> DVector<N>,
-  tol: <N as ComplexField>::RealField,
-  n_max: usize
+    initial: &[N],
+    f: fn(&[N]) -> DVector<N>,
+    f_deriv: fn(&[N]) -> DVector<N>,
+    tol: <N as ComplexField>::RealField,
+    n_max: usize,
 ) -> Result<DVector<N>, String> {
-  let mut guess = DVector::from_column_slice(initial);
-  let mut norm = guess.dot(&guess).sqrt().abs();
-  let mut n = 0;
+    let mut guess = DVector::from_column_slice(initial);
+    let mut norm = guess.dot(&guess).sqrt().abs();
+    let mut n = 0;
 
-  if norm <= tol {
-    return Ok(guess);
-  }
-
-  while n < n_max {
-    let f_val = f(guess.column(0).as_slice());
-    let f_deriv_val = f_deriv(guess.column(0).as_slice());
-    let adjustment = DVector::from_iterator(
-      guess.column(0).len(),
-      f_val.column(0).iter().zip(f_deriv_val.column(0).iter()).map(|(f, f_d)| *f / *f_d)
-    );
-    let new_guess = &guess - adjustment;
-    let new_norm = new_guess.dot(&new_guess).sqrt().abs();
-    if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
-      return Ok(new_guess);
+    if norm <= tol {
+        return Ok(guess);
     }
 
-    norm = new_norm;
-    guess = new_guess;
-    n += 1;
-  }
+    while n < n_max {
+        let f_val = f(guess.column(0).as_slice());
+        let f_deriv_val = f_deriv(guess.column(0).as_slice());
+        let adjustment = DVector::from_iterator(
+            guess.column(0).len(),
+            f_val
+                .column(0)
+                .iter()
+                .zip(f_deriv_val.column(0).iter())
+                .map(|(f, f_d)| *f / *f_d),
+        );
+        let new_guess = &guess - adjustment;
+        let new_norm = new_guess.dot(&new_guess).sqrt().abs();
+        if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
+            return Ok(new_guess);
+        }
 
-  Err("Newton: Maximum iterations exceeded".to_owned())
+        norm = new_norm;
+        guess = new_guess;
+        n += 1;
+    }
+
+    Err("Newton: Maximum iterations exceeded".to_owned())
 }
 
 /// Use secant method to find a root of a vector function.
@@ -241,46 +250,47 @@ pub fn newton<N: ComplexField>(
 /// }
 /// ```
 pub fn secant<N: ComplexField>(
-  initial: (&[N], &[N]),
-  f: fn(&[N]) -> DVector<N>,
-  tol: <N as ComplexField>::RealField,
-  n_max: usize
+    initial: (&[N], &[N]),
+    f: fn(&[N]) -> DVector<N>,
+    tol: <N as ComplexField>::RealField,
+    n_max: usize,
 ) -> Result<DVector<N>, String> {
-  let mut n = 0;
+    let mut n = 0;
 
-  let mut left = DVector::from_column_slice(initial.0);
-  let mut right = DVector::from_column_slice(initial.1);
+    let mut left = DVector::from_column_slice(initial.0);
+    let mut right = DVector::from_column_slice(initial.1);
 
-  let mut left_val = f(initial.0);
-  let mut right_val = f(initial.1);
+    let mut left_val = f(initial.0);
+    let mut right_val = f(initial.1);
 
-  let mut norm = right.dot(&right).sqrt().abs();
-  if norm <= tol {
-    return Ok(right);
-  }
-
-  while n <= n_max {
-    let adjustment = DVector::from_iterator(
-      right_val.iter().len(),
-      right_val.iter().enumerate().map(|(i, q)| {
-        *q * (*right.get(i).unwrap() - *left.get(i).unwrap()) / (*q - *left_val.get(i).unwrap())
-      })
-    );
-    let new_guess = &right - adjustment;
-    let new_norm = new_guess.dot(&new_guess).sqrt().abs();
-    if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
-      return Ok(new_guess);
+    let mut norm = right.dot(&right).sqrt().abs();
+    if norm <= tol {
+        return Ok(right);
     }
 
-    norm = new_norm;
-    left_val = right_val;
-    left = right;
-    right = new_guess;
-    right_val = f(right.column(0).as_slice());
-    n += 1;
-  }
+    while n <= n_max {
+        let adjustment = DVector::from_iterator(
+            right_val.iter().len(),
+            right_val.iter().enumerate().map(|(i, q)| {
+                *q * (*right.get(i).unwrap() - *left.get(i).unwrap())
+                    / (*q - *left_val.get(i).unwrap())
+            }),
+        );
+        let new_guess = &right - adjustment;
+        let new_norm = new_guess.dot(&new_guess).sqrt().abs();
+        if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
+            return Ok(new_guess);
+        }
 
-  Err("Secant: Maximum iterations exceeded".to_owned())
+        norm = new_norm;
+        left_val = right_val;
+        left = right;
+        right = new_guess;
+        right_val = f(right.column(0).as_slice());
+        n += 1;
+    }
+
+    Err("Secant: Maximum iterations exceeded".to_owned())
 }
 
 /*

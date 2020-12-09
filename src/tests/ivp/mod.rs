@@ -4,6 +4,6 @@
  * See repository LICENSE for information.
  */
 
+mod adams;
 mod euler;
 mod rk;
-mod adams;

@@ -32,35 +32,34 @@ use num_traits::{FromPrimitive, Zero};
 /// }
 /// ```
 pub fn newton_polynomial<N: ComplexField>(
-  initial: N,
-  poly: &Polynomial<N>,
-  tol: <N as ComplexField>::RealField,
-  n_max: usize
+    initial: N,
+    poly: &Polynomial<N>,
+    tol: <N as ComplexField>::RealField,
+    n_max: usize,
 ) -> Result<N, String> {
-  let mut n = 0;
+    let mut n = 0;
 
-  let mut guess = initial;
+    let mut guess = initial;
 
-
-  let mut norm = guess.abs();
-  if norm <= tol {
-    return Ok(guess);
-  }
-
-  while n < n_max {
-    let (f_val, f_deriv_val) = poly.evaluate_derivative(guess);
-    let new_guess = guess - (f_val / f_deriv_val);
-    let new_norm = new_guess.abs();
-    if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
-      return Ok(new_guess);
+    let mut norm = guess.abs();
+    if norm <= tol {
+        return Ok(guess);
     }
 
-    norm = new_norm;
-    guess = new_guess;
-    n += 1;
-  }
+    while n < n_max {
+        let (f_val, f_deriv_val) = poly.evaluate_derivative(guess);
+        let new_guess = guess - (f_val / f_deriv_val);
+        let new_norm = new_guess.abs();
+        if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
+            return Ok(new_guess);
+        }
 
-  Err("Newton_polynomial: maximum iterations exceeded".to_owned())
+        norm = new_norm;
+        guess = new_guess;
+        n += 1;
+    }
+
+    Err("Newton_polynomial: maximum iterations exceeded".to_owned())
 }
 
 /// Use Mueller's method on a polynomial. Note this usually requires complex numbers.
@@ -91,55 +90,62 @@ pub fn newton_polynomial<N: ComplexField>(
 /// }
 /// ```
 pub fn muller_polynomial<N: ComplexField>(
-  initial: (N, N, N),
-  poly: &Polynomial<N>,
-  tol: <N as ComplexField>::RealField,
-  n_max: usize
+    initial: (N, N, N),
+    poly: &Polynomial<N>,
+    tol: <N as ComplexField>::RealField,
+    n_max: usize,
 ) -> Result<Complex<<N as ComplexField>::RealField>, String> {
-  let poly = poly.make_complex();
-  let mut n = 0;
-  let mut poly_0 = Complex::<N::RealField>::new(initial.0.real(), initial.0.imaginary());
-  let mut poly_1 = Complex::<N::RealField>::new(initial.1.real(), initial.1.imaginary());
-  let mut poly_2 = Complex::<N::RealField>::new(initial.2.real(), initial.1.imaginary());
-  let mut h_1 = poly_1 - poly_0;
-  let mut h_2 = poly_2 - poly_1;
-  let poly_1_evaluated = poly.evaluate(poly_1);
-  let mut poly_2_evaluated = poly.evaluate(poly_2);
-  let mut delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
-  let mut delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
-  let mut delta = (delta_2 - delta_1) / (h_2 + h_1);
+    let poly = poly.make_complex();
+    let mut n = 0;
+    let mut poly_0 = Complex::<N::RealField>::new(initial.0.real(), initial.0.imaginary());
+    let mut poly_1 = Complex::<N::RealField>::new(initial.1.real(), initial.1.imaginary());
+    let mut poly_2 = Complex::<N::RealField>::new(initial.2.real(), initial.1.imaginary());
+    let mut h_1 = poly_1 - poly_0;
+    let mut h_2 = poly_2 - poly_1;
+    let poly_1_evaluated = poly.evaluate(poly_1);
+    let mut poly_2_evaluated = poly.evaluate(poly_2);
+    let mut delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
+    let mut delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
+    let mut delta = (delta_2 - delta_1) / (h_2 + h_1);
 
-  while n < n_max {
-    let b_coefficient = delta_2 + h_2 * delta;
-    let determinate = (
-      b_coefficient.powi(2)
-      - Complex::<N::RealField>::new(N::RealField::from_f64(4.0).unwrap(), N::RealField::zero())
-        * poly_2_evaluated*delta).sqrt();
-    let error =  if (b_coefficient -determinate).abs() <(b_coefficient + determinate).abs() {
-      b_coefficient + determinate
-    } else {
-      b_coefficient - determinate
-    };
-    let step = Complex::<N::RealField>::new(N::RealField::from_f64(-2.0).unwrap(), N::RealField::zero()) * poly_2_evaluated / error;
-    let p = poly_2 + step;
+    while n < n_max {
+        let b_coefficient = delta_2 + h_2 * delta;
+        let determinate = (b_coefficient.powi(2)
+            - Complex::<N::RealField>::new(
+                N::RealField::from_f64(4.0).unwrap(),
+                N::RealField::zero(),
+            ) * poly_2_evaluated
+                * delta)
+            .sqrt();
+        let error = if (b_coefficient - determinate).abs() < (b_coefficient + determinate).abs() {
+            b_coefficient + determinate
+        } else {
+            b_coefficient - determinate
+        };
+        let step = Complex::<N::RealField>::new(
+            N::RealField::from_f64(-2.0).unwrap(),
+            N::RealField::zero(),
+        ) * poly_2_evaluated
+            / error;
+        let p = poly_2 + step;
 
-    if step.abs() <= tol {
-      return Ok(p);
+        if step.abs() <= tol {
+            return Ok(p);
+        }
+
+        poly_0 = poly_1;
+        poly_1 = poly_2;
+        poly_2 = p;
+        poly_2_evaluated = poly.evaluate(p);
+        h_1 = poly_1 - poly_0;
+        h_2 = poly_2 - poly_1;
+        let poly_1_evaluated = poly.evaluate(poly_1);
+        delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
+        delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
+        delta = (delta_2 - delta_1) / (h_1 + h_2);
+
+        n += 1;
     }
 
-    poly_0 = poly_1;
-    poly_1 = poly_2;
-    poly_2 = p;
-    poly_2_evaluated = poly.evaluate(p);
-    h_1 = poly_1 - poly_0;
-    h_2 = poly_2 - poly_1;
-    let poly_1_evaluated = poly.evaluate(poly_1);
-    delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
-    delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
-    delta = (delta_2 - delta_1) / (h_1 + h_2);
-
-    n += 1;
-  }
-
-  Err("Muller: maximum iterations exceeded".to_owned())
+    Err("Muller: maximum iterations exceeded".to_owned())
 }
