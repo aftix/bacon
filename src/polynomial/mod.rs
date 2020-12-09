@@ -1,4 +1,4 @@
-use alga::general::{ComplexField};
+use alga::general::*;
 use std::ops;
 
 /// Polynomial on a ComplexField.
@@ -86,6 +86,14 @@ impl<N: ComplexField+From<f64>+Copy> Default for Polynomial<N> {
     Self::new()
   }
 }
+
+impl<N: ComplexField+From<f64>+Copy> AbstractMagma<Additive> for Polynomial<N> {
+  fn operate(&self, rhs: &Self) -> Self {
+    self + rhs
+  }
+}
+
+// TODO: Add other alga traits
 
 // Operator overloading
 
@@ -385,6 +393,47 @@ impl<N: ComplexField+From<f64>+Copy> ops::Mul<N> for &Polynomial<N> {
     }
     Polynomial {
       coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::MulAssign<N> for Polynomial<N> {
+  fn mul_assign(&mut self, rhs: N) {
+    for val in self.coefficients.iter_mut() {
+      *val *= rhs;
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Div<N> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn div(mut self, rhs: N) -> Polynomial<N> {
+    for val in &mut self.coefficients {
+      *val /= rhs;
+    }
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Div<N> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn div(self, rhs: N) -> Polynomial<N> {
+    let mut coefficients = Vec::from(self.coefficients.as_slice());
+    for val in &mut coefficients {
+      *val /= rhs;
+    }
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::DivAssign<N> for Polynomial<N> {
+  fn div_assign(&mut self, rhs: N) {
+    for val in &mut self.coefficients {
+      *val /= rhs;
     }
   }
 }
