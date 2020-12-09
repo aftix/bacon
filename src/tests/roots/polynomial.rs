@@ -4,7 +4,7 @@ use num_complex::Complex;
 
 #[test]
 fn newton() {
-  let mut poly: Polynomial<f64> = Polynomial::<f64>::new();
+  let mut poly = Polynomial::new();
   poly.set_coefficient(2, 1.0);
   poly.set_coefficient(0, -1.0);
 
@@ -22,7 +22,7 @@ fn newton() {
 
 #[test]
 fn muller() {
-  let mut poly: Polynomial<Complex<f64>> = Polynomial::<Complex<f64>>::new();
+  let mut poly = Polynomial::new();
   poly.set_coefficient(2, Complex::new(1.0, 0.0));
   poly.set_coefficient(0, Complex::new(-1.0, 0.0));
 

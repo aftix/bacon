@@ -1,8 +1,10 @@
 use crate::polynomial::Polynomial;
 
+mod operations;
+
 #[test]
 fn polynomial_evaluation() {
-  let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+  let mut polynomial = Polynomial::new();
   polynomial.set_coefficient(0, 5.0);
   polynomial.set_coefficient(1, -3.0);
   polynomial.set_coefficient(2, 4.0);
@@ -28,7 +30,7 @@ fn polynomial_evaluation() {
 
 #[test]
 fn polynomial_derivative_evaluation() {
-  let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+  let mut polynomial = Polynomial::new();
   polynomial.set_coefficient(0, 5.0);
   polynomial.set_coefficient(1, -3.0);
   polynomial.set_coefficient(2, 4.0);
@@ -60,7 +62,7 @@ fn polynomial_derivative_evaluation() {
 
 #[test]
 fn polynomial_derivative() {
-  let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+  let mut polynomial = Polynomial::new();
   polynomial.set_coefficient(0, 5.0);
   polynomial.set_coefficient(1, -3.0);
   polynomial.set_coefficient(2, 4.0);

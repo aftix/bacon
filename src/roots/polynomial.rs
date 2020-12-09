@@ -23,7 +23,7 @@ use alga::general::ComplexField;
 /// use bacon::polynomial::Polynomial;
 /// use bacon::roots::newton_polynomial;
 /// fn example() {
-///   let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+///   let mut polynomial = Polynomial::new();
 ///   polynomial.set_coefficient(2, 1.0);
 ///   polynomial.set_coefficient(0, -1.0);
 ///   let solution = newton_polynomial(0.5, &polynomial, 0.0001, 1000).unwrap();
@@ -82,7 +82,7 @@ pub fn newton_polynomial<N: ComplexField+From<f64>+Copy>(
 /// use bacon::polynomial::Polynomial;
 /// use bacon::roots::muller_polynomial;
 /// fn example() {
-///   let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+///   let mut polynomial = Polynomial::new();
 ///   polynomial.set_coefficient(2, 1.0);
 ///   polynomial.set_coefficient(0, -1.0);
 ///   let solution = muller_polynomial((0.0, 1.5, 2.0), &polynomial, 0.0001, 1000).unwrap();
@@ -104,17 +104,20 @@ pub fn muller_polynomial<N: ComplexField+From<f64>+Copy>(
   let mut poly_2_evaluated = poly.evaluate(poly_2);
   let mut delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
   let mut delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
-  let mut d = (delta_2 - delta_1) / (h_2 + h_1);
+  let mut delta = (delta_2 - delta_1) / (h_2 + h_1);
 
   while n < n_max {
-    let b = delta_2 + h_2 * d;
-    let determinate = (b.powi(2) - N::from(4.0) * poly_2_evaluated*d).sqrt();
-    let error =  if (b -determinate).abs() <(b + determinate).abs() { b + determinate } else { b - determinate } ;
-    let h = N::from(-2.0) * poly_2_evaluated / error;
-    let p = poly_2 + h;
-    println!("{}", p);
+    let b_coefficient = delta_2 + h_2 * delta;
+    let determinate = (b_coefficient.powi(2) - N::from(4.0) * poly_2_evaluated*delta).sqrt();
+    let error =  if (b_coefficient -determinate).abs() <(b_coefficient + determinate).abs() {
+      b_coefficient + determinate
+    } else {
+      b_coefficient - determinate
+    };
+    let step = N::from(-2.0) * poly_2_evaluated / error;
+    let p = poly_2 + step;
 
-    if h.abs() <= tol {
+    if step.abs() <= tol {
       return Ok(p);
     }
 
@@ -127,7 +130,7 @@ pub fn muller_polynomial<N: ComplexField+From<f64>+Copy>(
     let poly_1_evaluated = poly.evaluate(poly_1);
     delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
     delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
-    d = (delta_2 - delta_1) / (h_1 + h_2);
+    delta = (delta_2 - delta_1) / (h_1 + h_2);
 
     n += 1;
   }

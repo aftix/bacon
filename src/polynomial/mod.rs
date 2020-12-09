@@ -1,4 +1,5 @@
 use alga::general::{ComplexField};
+use std::ops;
 
 /// Polynomial on a ComplexField.
 #[derive(Debug,Clone)]
@@ -10,9 +11,9 @@ pub struct Polynomial<N: ComplexField+From<f64>+Copy> {
 
 impl<N: ComplexField+From<f64>+Copy> Polynomial<N> {
   /// Returns the zero polynomial on a given field
-  pub fn new<U: ComplexField+From<f64>+Copy>() -> Polynomial<U> {
+  pub fn new() -> Self {
     Polynomial{
-      coefficients: vec![U::from(0.0)]
+      coefficients: vec![N::from(0.0)]
     }
   }
 
@@ -54,11 +55,10 @@ impl<N: ComplexField+From<f64>+Copy> Polynomial<N> {
 
   /// Remove the coefficient of a power in the polynomial
   pub fn purge_coefficient(&mut self, power: u32) {
-    if power == self.coefficients.len() as u32 {
-      self.coefficients.pop();
-    } else if power < self.coefficients.len() as u32 {
-      self.coefficients[power as usize] = N::from(0.0);
-    }
+    match self.coefficients.len() as u32 {
+      len if len == power => { self.coefficients.pop(); },
+      _ => { self.coefficients[power as usize] = N::from(0.0); },
+    };
   }
 
   /// Get the derivative of the polynomial
@@ -77,6 +77,314 @@ impl<N: ComplexField+From<f64>+Copy> Polynomial<N> {
 
     Polynomial {
       coefficients: deriv_coeff
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> Default for Polynomial<N> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+// Operator overloading
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<N> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(mut self, rhs: N) -> Polynomial<N> {
+    self.coefficients[0] += rhs;
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<N> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(self, rhs: N) -> Polynomial<N> {
+    let mut coefficients = Vec::from(self.coefficients.as_slice());
+    coefficients[0] += rhs;
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<Polynomial<N>> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(mut self, rhs: Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val += rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(*val);
+    }
+
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<&Polynomial<N>> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(mut self, rhs: &Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val += rhs.coefficients[ind];
+    }
+
+    // Will only run if rhs has higher order
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(*val);
+    }
+
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<Polynomial<N>> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(self, rhs: Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    let mut coefficients = Vec::with_capacity(self.coefficients.len().max(rhs.coefficients.len()));
+    for (ind, val) in self.coefficients.iter().take(min_order).enumerate() {
+      coefficients.push(*val + rhs.coefficients[ind]);
+    }
+
+    // Only one loop will run
+    for val in self.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Add<&Polynomial<N>> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn add(self, rhs: &Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    let mut coefficients = Vec::with_capacity(self.coefficients.len().max(rhs.coefficients.len()));
+    for (ind, val) in self.coefficients.iter().take(min_order).enumerate() {
+      coefficients.push(*val + rhs.coefficients[ind]);
+    }
+
+    // Only one loop will run
+    for val in self.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::AddAssign<N> for Polynomial<N> {
+  fn add_assign(&mut self, rhs: N) {
+    self.coefficients[0] += rhs;
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::AddAssign<Polynomial<N>> for Polynomial<N> {
+  fn add_assign(&mut self, rhs: Polynomial<N>) {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val += rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(*val);
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::AddAssign<&Polynomial<N>> for Polynomial<N> {
+  fn add_assign(&mut self, rhs: &Polynomial<N>) {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val += rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(*val);
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<N> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(mut self, rhs: N) -> Polynomial<N> {
+    self.coefficients[0] -= rhs;
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<N> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(self, rhs: N) -> Polynomial<N> {
+    let mut coefficients = Vec::from(self.coefficients.as_slice());
+    coefficients[0] -= rhs;
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<Polynomial<N>> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(mut self, rhs: Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val -= rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(-*val);
+    }
+
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<Polynomial<N>> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(self, rhs: Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    let mut coefficients = Vec::with_capacity(self.coefficients.len().max(rhs.coefficients.len()));
+    for (ind, val) in self.coefficients.iter().take(min_order).enumerate() {
+      coefficients.push(*val - rhs.coefficients[ind]);
+    }
+
+    // Only one for loop runs
+    for val in self.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      coefficients.push(-*val);
+    }
+
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<&Polynomial<N>> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(mut self, rhs: &Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val -= rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(-*val);
+    }
+
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Sub<&Polynomial<N>> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn sub(self, rhs: &Polynomial<N>) -> Polynomial<N> {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    let mut coefficients = Vec::with_capacity(self.coefficients.len().max(rhs.coefficients.len()));
+    for (ind, val) in self.coefficients.iter().take(min_order).enumerate() {
+      coefficients.push(*val - rhs.coefficients[ind]);
+    }
+
+    // Only one for loop runs
+    for val in self.coefficients.iter().skip(min_order) {
+      coefficients.push(*val);
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      coefficients.push(-*val);
+    }
+
+    Polynomial {
+      coefficients
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::SubAssign<N> for Polynomial<N> {
+  fn sub_assign(&mut self, rhs: N) {
+    self.coefficients[0] -= rhs;
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::SubAssign<Polynomial<N>> for Polynomial<N> {
+  fn sub_assign(&mut self, rhs: Polynomial<N>) {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val -= rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(-*val);
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::SubAssign<&Polynomial<N>> for Polynomial<N> {
+  fn sub_assign(&mut self, rhs: &Polynomial<N>) {
+    let min_order = self.coefficients.len().min(rhs.coefficients.len());
+    for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
+      *val -= rhs.coefficients[ind];
+    }
+
+    for val in rhs.coefficients.iter().skip(min_order) {
+      self.coefficients.push(-*val);
+    }
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Mul<N> for Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn mul(mut self, rhs: N) -> Polynomial<N> {
+    for val in &mut self.coefficients {
+      *val *= rhs;
+    }
+    self
+  }
+}
+
+impl<N: ComplexField+From<f64>+Copy> ops::Mul<N> for &Polynomial<N> {
+  type Output = Polynomial<N>;
+
+  fn mul(self, rhs: N) -> Polynomial<N> {
+    let mut coefficients = Vec::with_capacity(self.coefficients.len());
+    for val in &self.coefficients {
+      coefficients.push(*val * rhs);
+    }
+    Polynomial {
+      coefficients
     }
   }
 }
