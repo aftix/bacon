@@ -2,6 +2,7 @@ use alga::general::*;
 use std::ops;
 use num_complex::Complex;
 use num_traits::{Zero};
+use std::iter::FromIterator;
 
 /// Polynomial on a ComplexField.
 #[derive(Debug,Clone)]
@@ -11,11 +12,37 @@ pub struct Polynomial<N: ComplexField> {
   coefficients: Vec<N>,
 }
 
+#[macro_export]
+macro_rules! polynomial {
+  ( $( $x:expr ),* ) => {
+    $crate::polynomial::Polynomial::from_slice(&[$($x),*])
+  }
+}
+
 impl<N: ComplexField> Polynomial<N> {
   /// Returns the zero polynomial on a given field
   pub fn new() -> Self {
     Polynomial{
       coefficients: vec![N::from_f64(0.0).unwrap()]
+    }
+  }
+
+  /// Returns the zero polynomial on a given field with preallocated memory
+  pub fn with_capacity(capacity: usize) -> Polynomial<N> {
+    let mut coefficients = Vec::with_capacity(capacity);
+    coefficients.push(N::zero());
+    Polynomial {
+      coefficients
+    }
+  }
+
+  /// Create a polynomial from a slice, with the first element of the slice being the highest power
+  pub fn from_slice(data: &[N]) -> Polynomial<N> {
+    if data.len() == 0 {
+      return Polynomial { coefficients: vec![N::zero()] };
+    }
+    Polynomial {
+      coefficients: Vec::from_iter(data.iter().rev().copied())
     }
   }
 
@@ -43,6 +70,9 @@ impl<N: ComplexField> Polynomial<N> {
 
   /// Evaluate a polynomial and its derivative at a value
   pub fn evaluate_derivative(&self, x: N) -> (N, N) {
+    if self.coefficients.len() == 1 {
+      return (self.coefficients[0], N::zero());
+    }
     // Start with biggest coefficients
     let mut acc_eval = *self.coefficients.last().unwrap();
     let mut acc_deriv = *self.coefficients.last().unwrap();

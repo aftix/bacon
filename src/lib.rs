@@ -16,6 +16,7 @@ extern crate num_traits;
 pub mod constants;
 pub mod ivp;
 pub mod roots;
+#[macro_use]
 pub mod polynomial;
 
 #[cfg(test)]

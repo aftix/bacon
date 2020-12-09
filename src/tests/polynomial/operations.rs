@@ -1,11 +1,6 @@
-use crate::polynomial::Polynomial;
-
 #[test]
 fn polynomial_add() {
-  let mut poly = Polynomial::new();
-  poly.set_coefficient(0, 5.0);
-  poly.set_coefficient(1, 6.0);
-  poly.set_coefficient(2, 4.0);
+  let mut poly = polynomial![4.0, 6.0, 5.0];
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
@@ -28,22 +23,19 @@ fn polynomial_add() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     assert!(approx_eq!(f64, (&poly + addend).evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
   }
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     assert!(approx_eq!(f64, (&poly + &addend).evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
   }
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly + addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -51,8 +43,7 @@ fn polynomial_add() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly + &addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -60,8 +51,7 @@ fn polynomial_add() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly + addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -69,8 +59,7 @@ fn polynomial_add() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly += addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -78,8 +67,7 @@ fn polynomial_add() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly += &addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0+5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -88,10 +76,7 @@ fn polynomial_add() {
 
 #[test]
 fn polynomial_sub() {
-  let mut poly = Polynomial::new();
-  poly.set_coefficient(0, 5.0);
-  poly.set_coefficient(1, 6.0);
-  poly.set_coefficient(2, 4.0);
+  let mut poly = polynomial![4.0, 6.0, 5.0];
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
@@ -114,22 +99,19 @@ fn polynomial_sub() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     assert!(approx_eq!(f64, (&poly - addend).evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
   }
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     assert!(approx_eq!(f64, (&poly - &addend).evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
   }
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly - addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -137,8 +119,7 @@ fn polynomial_sub() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly - &addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -146,8 +127,7 @@ fn polynomial_sub() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly = poly - addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -155,8 +135,7 @@ fn polynomial_sub() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly -= addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -164,8 +143,7 @@ fn polynomial_sub() {
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
-    let mut addend = Polynomial::new();
-    addend.set_coefficient(1, 5.0 * i);
+    let addend = polynomial![5.0*i, 0.0];
     poly -= &addend;
     assert!(approx_eq!(f64, poly.evaluate(i), 4.0*i.powi(2) + (6.0-5.0*i)*i + 5.0, epsilon=0.0001));
     poly.set_coefficient(1, 6.0);
@@ -174,10 +152,7 @@ fn polynomial_sub() {
 
 #[test]
 fn polynomial_mul() {
-  let mut poly = Polynomial::new();
-  poly.set_coefficient(0, 5.0);
-  poly.set_coefficient(1, 6.0);
-  poly.set_coefficient(2, 4.0);
+  let mut poly = polynomial![4.0, 6.0, 5.0];
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
@@ -205,10 +180,7 @@ fn polynomial_mul() {
 
 #[test]
 fn polynomial_div() {
-  let mut poly = Polynomial::new();
-  poly.set_coefficient(0, 5.0);
-  poly.set_coefficient(1, 6.0);
-  poly.set_coefficient(2, 4.0);
+  let mut poly = polynomial![4.0, 6.0, 5.0];
 
   for i in -1000..1000 {
     let i = i as f64 * 0.001;
