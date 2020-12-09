@@ -143,6 +143,14 @@ impl<N: ComplexField> Polynomial<N> {
   }
 }
 
+impl<N: ComplexField> FromIterator<N> for Polynomial<N> {
+  fn from_iter<I: IntoIterator<Item=N>>(iter: I) -> Polynomial<N> {
+    Polynomial {
+      coefficients: Vec::from_iter(iter)
+    }
+  }
+}
+
 impl<N: ComplexField> Default for Polynomial<N> {
   fn default() -> Self {
     Self::new()
