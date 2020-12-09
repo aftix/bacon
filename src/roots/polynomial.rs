@@ -17,6 +17,18 @@ use alga::general::ComplexField;
 /// `tol` The tolerance of relative error between iterations
 ///
 /// `n_max` the maximum number of iterations
+///
+/// # Examples
+/// ```
+/// use bacon::polynomial::Polynomial;
+/// use bacon::roots::newton_polynomial;
+/// fn example() {
+///   let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+///   polynomial.set_coefficient(2, 1.0);
+///   polynomial.set_coefficient(0, -1.0);
+///   let solution = newton_polynomial(0.5, &polynomial, 0.0001, 1000).unwrap();
+/// }
+/// ```
 pub fn newton_polynomial<N: ComplexField+From<f64>+Copy>(
   initial: N,
   poly: &Polynomial<N>,
@@ -47,4 +59,78 @@ pub fn newton_polynomial<N: ComplexField+From<f64>+Copy>(
   }
 
   Err("Newton_polynomial: maximum iterations exceeded".to_owned())
+}
+
+/// Use Mueller's method on a polynomial. Note this usually requires complex numbers.
+///
+/// Givin three initial guesses of a polynomial root, use Muller's method to
+/// approximate within tol.
+///
+/// # Returns
+/// `Ok(root)` when a root has been found, `Err` on failure
+///
+/// # Params
+/// `initial` Triplet of initial guesses
+///
+/// `poly` the polynomial to solve the root for
+///
+/// `tol` the tolerance of relative error between iterations
+///
+/// `n_max` Maximum number of iterations
+/// # Examples
+/// ```
+/// use bacon::polynomial::Polynomial;
+/// use bacon::roots::muller_polynomial;
+/// fn example() {
+///   let mut polynomial: Polynomial<f64> = Polynomial::<f64>::new();
+///   polynomial.set_coefficient(2, 1.0);
+///   polynomial.set_coefficient(0, -1.0);
+///   let solution = muller_polynomial((0.0, 1.5, 2.0), &polynomial, 0.0001, 1000).unwrap();
+/// }
+/// ```
+pub fn muller_polynomial<N: ComplexField+From<f64>+Copy>(
+  initial: (N, N, N),
+  poly: &Polynomial<N>,
+  tol: <N as ComplexField>::RealField,
+  n_max: usize
+) -> Result<N, String> {
+  let mut n = 0;
+  let mut poly_0 = initial.0;
+  let mut poly_1 = initial.1;
+  let mut poly_2 = initial.2;
+  let mut h_1 = poly_1 - poly_0;
+  let mut h_2 = poly_2 - poly_1;
+  let poly_1_evaluated = poly.evaluate(poly_1);
+  let mut poly_2_evaluated = poly.evaluate(poly_2);
+  let mut delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
+  let mut delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
+  let mut d = (delta_2 - delta_1) / (h_2 + h_1);
+
+  while n < n_max {
+    let b = delta_2 + h_2 * d;
+    let determinate = (b.powi(2) - N::from(4.0) * poly_2_evaluated*d).sqrt();
+    let error =  if (b -determinate).abs() <(b + determinate).abs() { b + determinate } else { b - determinate } ;
+    let h = N::from(-2.0) * poly_2_evaluated / error;
+    let p = poly_2 + h;
+    println!("{}", p);
+
+    if h.abs() <= tol {
+      return Ok(p);
+    }
+
+    poly_0 = poly_1;
+    poly_1 = poly_2;
+    poly_2 = p;
+    poly_2_evaluated = poly.evaluate(p);
+    h_1 = poly_1 - poly_0;
+    h_2 = poly_2 - poly_1;
+    let poly_1_evaluated = poly.evaluate(poly_1);
+    delta_1 = (poly_1_evaluated - poly.evaluate(poly_0)) / h_1;
+    delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
+    d = (delta_2 - delta_1) / (h_1 + h_2);
+
+    n += 1;
+  }
+
+  Err("Muller: maximum iterations exceeded".to_owned())
 }

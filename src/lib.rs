@@ -10,7 +10,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate float_cmp;
 
-extern crate num_traits;
+extern crate num_complex;
 
 pub mod constants;
 pub mod ivp;

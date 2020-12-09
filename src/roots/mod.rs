@@ -282,5 +282,51 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
 
   Err("Secant: Maximum iterations exceeded".to_owned())
 }
+/*
+pub fn muller<N: ComplexField+From<f64>+Into<N>>(
+  initial: (N, N, N),
+  f: fn(N) -> N,
+  tol: <N as ComplexField>::RealField,
+  n_max: usize
+) -> Result<N, String> {
+  let mut n = 0;
 
+  let mut poly_0 = initial.0;
+  let mut poly_1 = initial.1;
+  let mut poly_2 = initial.2;
 
+  let mut h_1 = poly_1 - poly_0;
+  let mut h_2 = poly_2 - poly_1;
+  let mut f_at_1 = f(poly_1);
+  let mut f_at_2 = f(poly_2);
+  let mut delta_1 = (f_at_1 - f(poly_0)) / h_2;
+  let mut delta_2 = (f_at_2 - f_at_1) / h_2;
+  let mut d = (delta_2 - delta_1) / (h_2 + h_1);
+
+  while n < n_max {
+    let b = delta_2 + h_2*d;
+    let determinant = (b.powi(2) - N::from(4.0)*f_at_2*d).sqrt();
+    let error = if (b - determinant).abs() < (b + determinant).abs() { b + determinant } else { b - determinant };
+    let h = N::from(-2.0) * f_at_2 / error;
+    let p = poly_2 + h;
+
+    if h.abs() <= tol {
+      return Ok(p);
+    }
+
+    poly_0 = poly_1;
+    poly_1 = poly_2;
+    poly_2 = p;
+    f_at_1 = f(poly_1);
+    f_at_2 = f(poly_2);
+    h_1 = poly_1 - poly_2;
+    h_2 = poly_2 - poly_1;
+    delta_1 = (f_at_1 - f(poly_0)) / h_1;
+    delta_2 = (f_at_2 - f_at_1) / h_2;
+    d = (delta_2 - delta_1) / (h_1 + h_2);
+    n += 1;
+  }
+
+  Err("Muller: maximum iterations exceeded".to_owned())
+}
+*/
