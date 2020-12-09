@@ -1,7 +1,7 @@
 use alga::general::*;
 use std::ops;
 use num_complex::Complex;
-use num_traits::{FromPrimitive, Zero, One};
+use num_traits::{Zero};
 
 /// Polynomial on a ComplexField.
 #[derive(Debug,Clone)]
@@ -91,6 +91,25 @@ impl<N: ComplexField> Polynomial<N> {
     Polynomial {
       coefficients: deriv_coeff
     }
+  }
+
+  /// Get the antiderivative of the polynomial with specified constant
+  pub fn antiderivative(&self, constant: N) -> Polynomial<N> {
+    let mut coefficients = Vec::with_capacity(self.coefficients.len()+1);
+    coefficients.push(constant);
+    for (ind, val) in self.coefficients.iter().enumerate() {
+      coefficients.push(*val * N::from_f64(1.0 / (ind + 1) as f64).unwrap());
+    }
+    Polynomial {
+      coefficients
+    }
+  }
+
+  /// Integrate this polynomial between to starting points
+  pub fn integrate(&self, lower: N, upper: N) -> N {
+    let poly_anti = self.antiderivative(N::zero());
+    println!("{:?}", poly_anti);
+    poly_anti.evaluate(upper) - poly_anti.evaluate(lower)
   }
 }
 

@@ -91,3 +91,21 @@ fn polynomial_derivative() {
     assert!(approx_eq!(f64, 1270.0 * i.powi(9), polynomial.evaluate(i), epsilon=0.00001));
   }
 }
+
+#[test]
+fn polynomial_integrate() {
+  let mut polynomial = Polynomial::new();
+  polynomial.set_coefficient(2, 1.0);
+
+  let area = polynomial.integrate(0.0, 10.0);
+  assert!(approx_eq!(f64, area, 333.3333333, epsilon=0.0000001));
+
+  polynomial.purge_coefficient(2);
+  polynomial.set_coefficient(3, 1.0);
+  let area = polynomial.integrate(-100.0, 100.0);
+  assert!(approx_eq!(f64, area, 0.0, epsilon=0.000001));
+
+  polynomial.set_coefficient(1, -3.0);
+  let area = polynomial.integrate(-2.0, 8.0);
+  assert!(approx_eq!(f64, area, 930.0, epsilon=0.00001))
+}
