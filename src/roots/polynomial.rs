@@ -1,5 +1,7 @@
 use crate::polynomial::Polynomial;
 use alga::general::ComplexField;
+use num_complex::Complex;
+use num_traits::{FromPrimitive, Zero};
 
 /// Use Newton's method on a polynomial.
 ///
@@ -29,7 +31,7 @@ use alga::general::ComplexField;
 ///   let solution = newton_polynomial(0.5, &polynomial, 0.0001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton_polynomial<N: ComplexField+From<f64>+Copy>(
+pub fn newton_polynomial<N: ComplexField>(
   initial: N,
   poly: &Polynomial<N>,
   tol: <N as ComplexField>::RealField,
@@ -88,16 +90,17 @@ pub fn newton_polynomial<N: ComplexField+From<f64>+Copy>(
 ///   let solution = muller_polynomial((0.0, 1.5, 2.0), &polynomial, 0.0001, 1000).unwrap();
 /// }
 /// ```
-pub fn muller_polynomial<N: ComplexField+From<f64>+Copy>(
+pub fn muller_polynomial<N: ComplexField>(
   initial: (N, N, N),
   poly: &Polynomial<N>,
   tol: <N as ComplexField>::RealField,
   n_max: usize
-) -> Result<N, String> {
+) -> Result<Complex<<N as ComplexField>::RealField>, String> {
+  let poly = poly.make_complex();
   let mut n = 0;
-  let mut poly_0 = initial.0;
-  let mut poly_1 = initial.1;
-  let mut poly_2 = initial.2;
+  let mut poly_0 = Complex::<N::RealField>::new(initial.0.real(), initial.0.imaginary());
+  let mut poly_1 = Complex::<N::RealField>::new(initial.1.real(), initial.1.imaginary());
+  let mut poly_2 = Complex::<N::RealField>::new(initial.2.real(), initial.1.imaginary());
   let mut h_1 = poly_1 - poly_0;
   let mut h_2 = poly_2 - poly_1;
   let poly_1_evaluated = poly.evaluate(poly_1);
@@ -108,13 +111,16 @@ pub fn muller_polynomial<N: ComplexField+From<f64>+Copy>(
 
   while n < n_max {
     let b_coefficient = delta_2 + h_2 * delta;
-    let determinate = (b_coefficient.powi(2) - N::from(4.0) * poly_2_evaluated*delta).sqrt();
+    let determinate = (
+      b_coefficient.powi(2)
+      - Complex::<N::RealField>::new(N::RealField::from_f64(4.0).unwrap(), N::RealField::zero())
+        * poly_2_evaluated*delta).sqrt();
     let error =  if (b_coefficient -determinate).abs() <(b_coefficient + determinate).abs() {
       b_coefficient + determinate
     } else {
       b_coefficient - determinate
     };
-    let step = N::from(-2.0) * poly_2_evaluated / error;
+    let step = Complex::<N::RealField>::new(N::RealField::from_f64(-2.0).unwrap(), N::RealField::zero()) * poly_2_evaluated / error;
     let p = poly_2 + step;
 
     if step.abs() <= tol {

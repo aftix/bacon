@@ -41,7 +41,7 @@ pub use polynomial::*;
 ///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn bisection<N: RealField+From<f64>>((mut left, mut right): (N, N), f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
+pub fn bisection<N: RealField>((mut left, mut right): (N, N), f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
 {
   if left >= right {
     return Err("Bisection: requirement: right > left".to_owned());
@@ -54,7 +54,7 @@ pub fn bisection<N: RealField+From<f64>>((mut left, mut right): (N, N), f: fn(N)
     return Err("Bisection: requirement: Signs must be different".to_owned());
   }
 
-  let mut half_interval = (left - right) * N::from(0.5);
+  let mut half_interval = (left - right) * N::from_f64(0.5).unwrap();
   let mut middle = left + half_interval;
 
   if middle.abs() <= tol {
@@ -70,7 +70,7 @@ pub fn bisection<N: RealField+From<f64>>((mut left, mut right): (N, N), f: fn(N)
       right = middle;
     }
 
-    half_interval = (right - left) * N::from(0.5);
+    half_interval = (right - left) * N::from_f64(0.5).unwrap();
 
     let middle_new = left + half_interval;
 
@@ -172,15 +172,15 @@ pub fn steffensen<N: RealField+From<f64>+Copy>(
 ///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton<N: RealField, M: ComplexField+Into<N>>(
-  initial: &[M],
-  f: fn(&[M]) -> DVector<M>,
-  f_deriv: fn(&[M]) -> DVector<M>,
-  tol: N,
+pub fn newton<N: ComplexField>(
+  initial: &[N],
+  f: fn(&[N]) -> DVector<N>,
+  f_deriv: fn(&[N]) -> DVector<N>,
+  tol: <N as ComplexField>::RealField,
   n_max: usize
-) -> Result<DVector<M>, String> {
+) -> Result<DVector<N>, String> {
   let mut guess = DVector::from_column_slice(initial);
-  let mut norm: N = guess.dot(&guess).sqrt().into();
+  let mut norm = guess.dot(&guess).sqrt().abs();
   let mut n = 0;
 
   if norm <= tol {
@@ -195,7 +195,7 @@ pub fn newton<N: RealField, M: ComplexField+Into<N>>(
       f_val.column(0).iter().zip(f_deriv_val.column(0).iter()).map(|(f, f_d)| *f / *f_d)
     );
     let new_guess = &guess - adjustment;
-    let new_norm = new_guess.dot(&new_guess).sqrt().into();
+    let new_norm = new_guess.dot(&new_guess).sqrt().abs();
     if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
       return Ok(new_guess);
     }
@@ -240,12 +240,12 @@ pub fn newton<N: RealField, M: ComplexField+Into<N>>(
 ///   let solution = secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
-  initial: (&[M], &[M]),
-  f: fn(&[M]) -> DVector<M>,
-  tol: N,
+pub fn secant<N: ComplexField>(
+  initial: (&[N], &[N]),
+  f: fn(&[N]) -> DVector<N>,
+  tol: <N as ComplexField>::RealField,
   n_max: usize
-) -> Result<DVector<M>, String> {
+) -> Result<DVector<N>, String> {
   let mut n = 0;
 
   let mut left = DVector::from_column_slice(initial.0);
@@ -254,7 +254,7 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
   let mut left_val = f(initial.0);
   let mut right_val = f(initial.1);
 
-  let mut norm = right.dot(&right).sqrt().into();
+  let mut norm = right.dot(&right).sqrt().abs();
   if norm <= tol {
     return Ok(right);
   }
@@ -267,7 +267,7 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
       })
     );
     let new_guess = &right - adjustment;
-    let new_norm = new_guess.dot(&new_guess).sqrt().into();
+    let new_norm = new_guess.dot(&new_guess).sqrt().abs();
     if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
       return Ok(new_guess);
     }
@@ -282,6 +282,7 @@ pub fn secant<N: RealField+From<f64>, M: ComplexField+Into<N>>(
 
   Err("Secant: Maximum iterations exceeded".to_owned())
 }
+
 /*
 pub fn muller<N: ComplexField+From<f64>+Into<N>>(
   initial: (N, N, N),

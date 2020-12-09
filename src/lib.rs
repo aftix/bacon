@@ -11,6 +11,7 @@ extern crate lazy_static;
 extern crate float_cmp;
 
 extern crate num_complex;
+extern crate num_traits;
 
 pub mod constants;
 pub mod ivp;

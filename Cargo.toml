@@ -13,4 +13,6 @@ serde={version="1.0", optional=true}
 nalgebra="0.23"
 float-cmp="0.8"
 num-complex="0.2"
+num-traits="0.2"
 alga="0.9"
+
