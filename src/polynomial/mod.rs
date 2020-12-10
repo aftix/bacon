@@ -36,13 +36,27 @@ impl<N: ComplexField> Polynomial<N> {
 
     /// Create a polynomial from a slice, with the first element of the slice being the highest power
     pub fn from_slice(data: &[N]) -> Polynomial<N> {
-        if data.len() == 0 {
+        if data.is_empty() {
             return Polynomial {
                 coefficients: vec![N::zero()],
             };
         }
         Polynomial {
             coefficients: Vec::from_iter(data.iter().rev().copied()),
+        }
+    }
+
+    /// Get the order of the polynomial
+    pub fn order(&self) -> usize {
+        self.coefficients.len() - 1
+    }
+
+    /// Get the coefficient of a power
+    pub fn get_coefficient(&self, ind: usize) -> N {
+        if ind >= self.coefficients.len() {
+            N::zero()
+        } else {
+            self.coefficients[ind]
         }
     }
 
@@ -95,13 +109,13 @@ impl<N: ComplexField> Polynomial<N> {
     }
 
     /// Remove the coefficient of a power in the polynomial
-    pub fn purge_coefficient(&mut self, power: u32) {
-        match self.coefficients.len() as u32 {
+    pub fn purge_coefficient(&mut self, power: usize) {
+        match self.coefficients.len() {
             len if len == power => {
                 self.coefficients.pop();
             }
             _ => {
-                self.coefficients[power as usize] = N::from_f64(0.0).unwrap();
+                self.coefficients[power] = N::from_f64(0.0).unwrap();
             }
         };
     }
@@ -140,6 +154,62 @@ impl<N: ComplexField> Polynomial<N> {
         let poly_anti = self.antiderivative(N::zero());
         println!("{:?}", poly_anti);
         poly_anti.evaluate(upper) - poly_anti.evaluate(lower)
+    }
+
+    /// Divide this polynomial by another, getting a quotient and remainder, using tol to check for 0
+    pub fn divide(
+        &self,
+        divisor: &Polynomial<N>,
+        tol: <N as ComplexField>::RealField,
+    ) -> Result<(Polynomial<N>, Polynomial<N>), String> {
+        if divisor.coefficients.len() == 1
+            && divisor.coefficients[0].real().abs() < tol
+            && divisor.coefficients[0].imaginary().abs() < tol
+        {
+            return Err("Polynomial division: Can not divide by 0".to_owned());
+        }
+
+        let mut quotient = Polynomial::new();
+        let mut remainder = Polynomial::from_iter(self.coefficients.iter().copied());
+        let mut temp = Polynomial::new();
+
+        while remainder.coefficients.len() >= divisor.coefficients.len()
+            && !(remainder.coefficients.len() == 1
+                && remainder.coefficients[0].real().abs() < tol
+                && remainder.coefficients[0].imaginary().abs() < tol)
+        {
+            // Get the power left over from dividing lead terms
+            let order = remainder.coefficients.len() - divisor.coefficients.len();
+            // Make a vector that is just the lead coefficients divided at the right power
+            temp.coefficients = vec![N::zero(); order + 1];
+            temp.coefficients[order] =
+                *remainder.coefficients.last().unwrap() / *divisor.coefficients.last().unwrap();
+            // Add the division to the quotient
+            quotient += &temp;
+            // Get the amount to shift divisor by
+            let padding = temp.coefficients.len() - 1;
+            // Multiply every coefficient in divisor by temp's coefficient
+            temp = Polynomial::from_iter(
+                divisor
+                    .coefficients
+                    .iter()
+                    .map(|c| *c * *temp.coefficients.last().unwrap()),
+            );
+            // Shift the coefficients to multiply by the right power of x
+            for _ in 0..padding {
+                temp.coefficients.insert(0, N::zero());
+            }
+            // remainder -= temp x d;
+            remainder -= &temp;
+            while remainder.coefficients.len() > 1
+                && remainder.coefficients.last().unwrap().real().abs() < tol
+                && remainder.coefficients.last().unwrap().imaginary().abs() < tol
+            {
+                remainder.coefficients.pop();
+            }
+        }
+
+        Ok((quotient, remainder))
     }
 }
 

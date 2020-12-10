@@ -1,5 +1,5 @@
 #[test]
-fn polynomial_add() {
+fn polynomial_addition() {
     let mut poly = polynomial![4.0, 6.0, 5.0];
 
     for i in -1000..1000 {
@@ -125,7 +125,7 @@ fn polynomial_add() {
 }
 
 #[test]
-fn polynomial_sub() {
+fn polynomial_subtraction() {
     let mut poly = polynomial![4.0, 6.0, 5.0];
 
     for i in -1000..1000 {
@@ -251,7 +251,7 @@ fn polynomial_sub() {
 }
 
 #[test]
-fn polynomial_mul() {
+fn polynomial_multiplication() {
     let mut poly = polynomial![4.0, 6.0, 5.0];
 
     for i in -1000..1000 {
@@ -294,7 +294,7 @@ fn polynomial_mul() {
 }
 
 #[test]
-fn polynomial_div() {
+fn polynomial_scalar_divsion() {
     let mut poly = polynomial![4.0, 6.0, 5.0];
 
     for i in -1000..1000 {
@@ -343,4 +343,55 @@ fn polynomial_div() {
         poly.set_coefficient(1, 6.0);
         poly.set_coefficient(2, 4.0);
     }
+}
+
+#[test]
+fn polynomial_long_division() {
+    let dividend = polynomial![1.0, 0.0, -1.0];
+    let divisor = polynomial![1.0, 1.0];
+    let (quotient, remainder) = dividend.divide(&divisor, 1e-5).unwrap();
+    assert_eq!(remainder.order(), 0);
+    assert!(approx_eq!(
+        f64,
+        remainder.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert_eq!(quotient.order(), 1);
+    assert!(approx_eq!(
+        f64,
+        quotient.get_coefficient(0),
+        -1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        quotient.get_coefficient(1),
+        1.0,
+        epsilon = 0.000001
+    ));
+
+    let dividend = polynomial![1.0, -2.0, 1.0, 1.0];
+    let divisor = polynomial![1.0, 0.0, 1.0];
+    let (quotient, remainder) = dividend.divide(&divisor, 1e-5).unwrap();
+    assert_eq!(remainder.order(), 0);
+    assert!(approx_eq!(
+        f64,
+        remainder.get_coefficient(0),
+        3.0,
+        epsilon = 0.000001
+    ));
+    assert_eq!(quotient.order(), 1);
+    assert!(approx_eq!(
+        f64,
+        quotient.get_coefficient(1),
+        1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        quotient.get_coefficient(0),
+        -2.0,
+        epsilon = 0.0000001
+    ));
 }
