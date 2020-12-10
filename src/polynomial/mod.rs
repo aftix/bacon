@@ -580,3 +580,24 @@ impl<N: ComplexField> ops::DivAssign<N> for Polynomial<N> {
         }
     }
 }
+
+impl<N: ComplexField> ops::Neg for Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn neg(mut self) -> Polynomial<N> {
+        for val in &mut self.coefficients {
+            *val = -*val;
+        }
+        self
+    }
+}
+
+impl<N: ComplexField> ops::Neg for &Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn neg(self) -> Polynomial<N> {
+        Polynomial {
+            coefficients: Vec::from_iter(self.coefficients.iter().map(|c| -*c)),
+        }
+    }
+}
