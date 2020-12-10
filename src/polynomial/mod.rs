@@ -1,6 +1,8 @@
+use crate::roots::newton_polynomial;
 use alga::general::*;
 use num_complex::Complex;
-use num_traits::Zero;
+use num_traits::{One, Zero};
+use std::collections::VecDeque;
 use std::iter::FromIterator;
 use std::ops;
 
@@ -120,6 +122,16 @@ impl<N: ComplexField> Polynomial<N> {
         };
     }
 
+    /// Remove all leading 0 coefficients
+    pub fn purge_leading(&mut self, tol: <N as ComplexField>::RealField) {
+        while self.coefficients.len() > 1
+            && self.coefficients.last().unwrap().real().abs() <= tol
+            && self.coefficients.last().unwrap().imaginary().abs() <= tol
+        {
+            self.coefficients.pop();
+        }
+    }
+
     /// Get the derivative of the polynomial
     pub fn derivative(&self) -> Polynomial<N> {
         if self.coefficients.len() == 1 {
@@ -152,7 +164,6 @@ impl<N: ComplexField> Polynomial<N> {
     /// Integrate this polynomial between to starting points
     pub fn integrate(&self, lower: N, upper: N) -> N {
         let poly_anti = self.antiderivative(N::zero());
-        println!("{:?}", poly_anti);
         poly_anti.evaluate(upper) - poly_anti.evaluate(lower)
     }
 
@@ -171,7 +182,16 @@ impl<N: ComplexField> Polynomial<N> {
 
         let mut quotient = Polynomial::new();
         let mut remainder = Polynomial::from_iter(self.coefficients.iter().copied());
+        remainder.purge_leading(tol);
         let mut temp = Polynomial::new();
+
+        if divisor.coefficients.len() == 1 {
+            let idivisor = N::from_f64(1.0).unwrap() / divisor.coefficients[0];
+            return Ok((
+                Polynomial::from_iter(remainder.coefficients.iter().map(|c| *c * idivisor)),
+                Polynomial::new(),
+            ));
+        }
 
         while remainder.coefficients.len() >= divisor.coefficients.len()
             && !(remainder.coefficients.len() == 1
@@ -210,6 +230,112 @@ impl<N: ComplexField> Polynomial<N> {
         }
 
         Ok((quotient, remainder))
+    }
+
+    /// Get the n (possibly including repeats) of the polynomial given n guesses
+    pub fn roots(
+        &self,
+        guesses: &[N],
+        tol: <N as ComplexField>::RealField,
+        n_max: usize,
+    ) -> Result<VecDeque<Complex<<N as ComplexField>::RealField>>, String> {
+        if guesses.len() != self.coefficients.len() - 1 {
+            return Err("Polynomial roots: Guesses don't match the order".to_owned());
+        }
+
+        if self.coefficients.len() > 1
+            && self.coefficients.last().unwrap().real().abs() < tol
+            && self.coefficients.last().unwrap().imaginary().abs() < tol
+        {
+            return Err("Polynomial roots: Leading 0 coefficient!".to_owned());
+        }
+
+        let guesses = VecDeque::from_iter(guesses.iter());
+
+        match self.coefficients.len() {
+            1 => {
+                // Only constant, root only if constant is 0
+                if self.coefficients[0].real().abs() < tol
+                    && self.coefficients[0].imaginary().abs() < tol
+                {
+                    return Ok(VecDeque::from(vec![Complex::<N::RealField>::zero()]));
+                }
+                return Err("Polynomial roots: Non-zero constant has no root".to_owned());
+            }
+            2 => {
+                // Linear term, root easy
+                let division = -self.coefficients[0] / self.coefficients[1];
+                return Ok(VecDeque::from(vec![Complex::<N::RealField>::new(
+                    division.real(),
+                    division.imaginary(),
+                )]));
+            }
+            3 => {
+                // Use quadratic formula and return in right order
+                let determinant = self.coefficients[1].powi(2)
+                    - N::from_f64(4.0).unwrap() * self.coefficients[2] * self.coefficients[0];
+                let determinant =
+                    Complex::<N::RealField>::new(determinant.real(), determinant.imaginary())
+                        .sqrt();
+                let leading = self.coefficients[2];
+                let leading = Complex::<N::RealField>::new(leading.real(), leading.imaginary());
+                let leading = leading
+                    * Complex::<N::RealField>::new(
+                        N::from_f64(2.0).unwrap().real(),
+                        N::zero().real(),
+                    );
+                let secondary = self.coefficients[1];
+                let secondary =
+                    Complex::<N::RealField>::new(secondary.real(), secondary.imaginary());
+                let positive = (-secondary + determinant) / leading;
+                let negative = (-secondary - determinant) / leading;
+                let guess = Complex::<N::RealField>::new(guesses[0].real(), guesses[0].imaginary());
+                if (positive - guess).abs() < (negative - guess).abs() {
+                    return Ok(VecDeque::from(vec![positive, negative]));
+                }
+                return Ok(VecDeque::from(vec![negative, positive]));
+            }
+            _ => {}
+        }
+
+        if self.coefficients.len() <= 2 {
+            if self.coefficients[0].real().abs() < tol
+                && self.coefficients[0].imaginary().abs() < tol
+            {
+                return Ok(VecDeque::from(vec![Complex::<N::RealField>::zero()]));
+            }
+            if self.coefficients[1].real().abs() < tol
+                && self.coefficients[1].imaginary().abs() < tol
+            {
+                return Err("Polynomial roots: constant non-zero value has no roots".to_owned());
+            }
+        }
+        let complex = self.make_complex();
+
+        let guess = guesses[0];
+        let root = newton_polynomial(
+            Complex::<N::RealField>::new(guess.real(), guess.imaginary()),
+            &complex,
+            tol,
+            n_max,
+        )?;
+        let divisor = polynomial![Complex::<N::RealField>::one(), -root];
+        let (quotient, _) = complex.divide(&divisor, tol)?;
+        let mut roots = quotient.roots(
+            &guesses
+                .iter()
+                .map(|c| Complex::<N::RealField>::new(c.real(), c.imaginary()))
+                .collect::<Vec<_>>()[1..],
+            tol,
+            n_max,
+        )?;
+        roots.push_front(root);
+        let mut corrected_roots = VecDeque::with_capacity(roots.len());
+        for root in roots.iter() {
+            corrected_roots.push_back(newton_polynomial(*root, &complex, tol, n_max)?);
+        }
+
+        Ok(corrected_roots)
     }
 }
 
