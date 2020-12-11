@@ -4,15 +4,15 @@
  * See repository LICENSE for information.
  */
 
-use crate::ivp;
+use crate::ivp::{Euler, IVPSolver};
 use nalgebra::DVector;
 
-fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
-    DVector::from_column_slice(y)
+fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String> {
+    Ok(DVector::from_column_slice(y))
 }
 
-fn quadratic_deriv(t: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
-    DVector::from_iterator(y.len(), [-2.0 * t].repeat(y.len()))
+fn quadratic_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String> {
+    Ok(DVector::from_iterator(y.len(), [-2.0 * t].repeat(y.len())))
 }
 
 // Test euler method on y = exp(x), y' = exp(x) = y, y(0) = 1
@@ -22,7 +22,18 @@ fn euler_test_exp() {
     let t_final = 1.0;
     let dt = 0.0005;
 
-    let path = ivp::euler((t_initial, t_final), &[1.0], dt, exp_deriv, &mut ());
+    let mut euler = Euler::new()
+        .with_dt_max(dt)
+        .unwrap()
+        .with_start(t_initial)
+        .unwrap()
+        .with_end(t_final)
+        .unwrap()
+        .with_initial_conditions(&[1.0])
+        .unwrap()
+        .build();
+
+    let path = euler.solve_ivp(exp_deriv, &mut ()).unwrap();
 
     for step in &path {
         assert!(approx_eq!(
@@ -41,7 +52,18 @@ fn euler_test_quadratic() {
     let t_final = 1.0;
     let dt = 0.0001;
 
-    let path = ivp::euler((t_initial, t_final), &[1.0], dt, quadratic_deriv, &mut ());
+    let mut euler = Euler::new()
+        .with_dt_max(dt)
+        .unwrap()
+        .with_start(t_initial)
+        .unwrap()
+        .with_end(t_final)
+        .unwrap()
+        .with_initial_conditions(&[1.0])
+        .unwrap()
+        .build();
+
+    let path = euler.solve_ivp(quadratic_deriv, &mut ()).unwrap();
 
     for step in &path {
         assert!(approx_eq!(
