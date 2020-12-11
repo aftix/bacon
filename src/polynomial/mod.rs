@@ -1,10 +1,9 @@
 use crate::roots::newton_polynomial;
 use alga::general::*;
 use num_complex::Complex;
-use num_traits::{One, Zero};
+use num_traits::{FromPrimitive, One, Zero};
 use std::collections::VecDeque;
-use std::iter::FromIterator;
-use std::ops;
+use std::{any::TypeId, f64, iter::FromIterator, ops};
 
 /// Polynomial on a ComplexField.
 #[derive(Debug, Clone)]
@@ -12,6 +11,7 @@ use std::ops;
 pub struct Polynomial<N: ComplexField> {
     // Index 0 is constant, 1 is linear, etc.
     coefficients: Vec<N>,
+    tolerance: <N as ComplexField>::RealField,
 }
 
 #[macro_export]
@@ -26,26 +26,55 @@ impl<N: ComplexField> Polynomial<N> {
     pub fn new() -> Self {
         Polynomial {
             coefficients: vec![N::from_f64(0.0).unwrap()],
+            tolerance: N::RealField::from_f64(1e-10).unwrap(),
         }
     }
 
+    pub fn with_tolerance(tolerance: <N as ComplexField>::RealField) -> Result<Self, String> {
+        if !tolerance.is_sign_positive() {
+            return Err("Polynomial with_tolerance: Tolerance must be positive".to_owned());
+        }
+        Ok(Polynomial {
+            coefficients: vec![N::from_f64(0.0).unwrap()],
+            tolerance,
+        })
+    }
+
     /// Returns the zero polynomial on a given field with preallocated memory
-    pub fn with_capacity(capacity: usize) -> Polynomial<N> {
+    pub fn with_capacity(capacity: usize) -> Self {
         let mut coefficients = Vec::with_capacity(capacity);
         coefficients.push(N::zero());
-        Polynomial { coefficients }
+        Polynomial::from_iter(coefficients.iter().copied())
     }
 
     /// Create a polynomial from a slice, with the first element of the slice being the highest power
-    pub fn from_slice(data: &[N]) -> Polynomial<N> {
+    pub fn from_slice(data: &[N]) -> Self {
         if data.is_empty() {
             return Polynomial {
                 coefficients: vec![N::zero()],
+                tolerance: N::RealField::from_f64(1e-10).unwrap(),
             };
         }
         Polynomial {
             coefficients: Vec::from_iter(data.iter().rev().copied()),
+            tolerance: N::RealField::from_f64(1e-10).unwrap(),
         }
+    }
+
+    pub fn set_tolerance(
+        &mut self,
+        tolerance: <N as ComplexField>::RealField,
+    ) -> Result<(), String> {
+        if !tolerance.is_sign_positive() {
+            return Err("Polynomial set_tolerance: tolerance must be positive".to_owned());
+        }
+
+        self.tolerance = tolerance;
+        Ok(())
+    }
+
+    pub fn get_tolerance(&self) -> <N as ComplexField>::RealField {
+        self.tolerance
     }
 
     /// Get the order of the polynomial
@@ -69,7 +98,10 @@ impl<N: ComplexField> Polynomial<N> {
         for val in &self.coefficients {
             coefficients.push(Complex::<N::RealField>::new(val.real(), val.imaginary()));
         }
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 
     /// Evaluate a polynomial at a value
@@ -123,20 +155,21 @@ impl<N: ComplexField> Polynomial<N> {
     }
 
     /// Remove all leading 0 coefficients
-    pub fn purge_leading(&mut self, tol: <N as ComplexField>::RealField) {
+    pub fn purge_leading(&mut self) {
         while self.coefficients.len() > 1
-            && self.coefficients.last().unwrap().real().abs() <= tol
-            && self.coefficients.last().unwrap().imaginary().abs() <= tol
+            && self.coefficients.last().unwrap().real().abs() <= self.tolerance
+            && self.coefficients.last().unwrap().imaginary().abs() <= self.tolerance
         {
             self.coefficients.pop();
         }
     }
 
     /// Get the derivative of the polynomial
-    pub fn derivative(&self) -> Polynomial<N> {
+    pub fn derivative(&self) -> Self {
         if self.coefficients.len() == 1 {
             return Polynomial {
                 coefficients: vec![N::from_f64(0.0).unwrap()],
+                tolerance: self.tolerance,
             };
         }
 
@@ -148,17 +181,21 @@ impl<N: ComplexField> Polynomial<N> {
 
         Polynomial {
             coefficients: deriv_coeff,
+            tolerance: self.tolerance,
         }
     }
 
     /// Get the antiderivative of the polynomial with specified constant
-    pub fn antiderivative(&self, constant: N) -> Polynomial<N> {
+    pub fn antiderivative(&self, constant: N) -> Self {
         let mut coefficients = Vec::with_capacity(self.coefficients.len() + 1);
         coefficients.push(constant);
         for (ind, val) in self.coefficients.iter().enumerate() {
             coefficients.push(*val * N::from_f64(1.0 / (ind + 1) as f64).unwrap());
         }
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 
     /// Integrate this polynomial between to starting points
@@ -168,21 +205,18 @@ impl<N: ComplexField> Polynomial<N> {
     }
 
     /// Divide this polynomial by another, getting a quotient and remainder, using tol to check for 0
-    pub fn divide(
-        &self,
-        divisor: &Polynomial<N>,
-        tol: <N as ComplexField>::RealField,
-    ) -> Result<(Polynomial<N>, Polynomial<N>), String> {
+    pub fn divide(&self, divisor: &Polynomial<N>) -> Result<(Self, Self), String> {
         if divisor.coefficients.len() == 1
-            && divisor.coefficients[0].real().abs() < tol
-            && divisor.coefficients[0].imaginary().abs() < tol
+            && divisor.coefficients[0].real().abs() < self.tolerance
+            && divisor.coefficients[0].imaginary().abs() < self.tolerance
         {
             return Err("Polynomial division: Can not divide by 0".to_owned());
         }
 
-        let mut quotient = Polynomial::new();
+        let mut quotient = Polynomial::with_tolerance(self.tolerance)?;
         let mut remainder = Polynomial::from_iter(self.coefficients.iter().copied());
-        remainder.purge_leading(tol);
+        remainder.tolerance = self.tolerance;
+        remainder.purge_leading();
         let mut temp = Polynomial::new();
 
         if divisor.coefficients.len() == 1 {
@@ -195,8 +229,8 @@ impl<N: ComplexField> Polynomial<N> {
 
         while remainder.coefficients.len() >= divisor.coefficients.len()
             && !(remainder.coefficients.len() == 1
-                && remainder.coefficients[0].real().abs() < tol
-                && remainder.coefficients[0].imaginary().abs() < tol)
+                && remainder.coefficients[0].real().abs() < self.tolerance
+                && remainder.coefficients[0].imaginary().abs() < self.tolerance)
         {
             // Get the power left over from dividing lead terms
             let order = remainder.coefficients.len() - divisor.coefficients.len();
@@ -222,8 +256,8 @@ impl<N: ComplexField> Polynomial<N> {
             // remainder -= temp x d;
             remainder -= &temp;
             while remainder.coefficients.len() > 1
-                && remainder.coefficients.last().unwrap().real().abs() < tol
-                && remainder.coefficients.last().unwrap().imaginary().abs() < tol
+                && remainder.coefficients.last().unwrap().real().abs() < self.tolerance
+                && remainder.coefficients.last().unwrap().imaginary().abs() < self.tolerance
             {
                 remainder.coefficients.pop();
             }
@@ -320,7 +354,7 @@ impl<N: ComplexField> Polynomial<N> {
             n_max,
         )?;
         let divisor = polynomial![Complex::<N::RealField>::one(), -root];
-        let (quotient, _) = complex.divide(&divisor, tol)?;
+        let (quotient, _) = complex.divide(&divisor)?;
         let mut roots = quotient.roots(
             &guesses
                 .iter()
@@ -337,12 +371,124 @@ impl<N: ComplexField> Polynomial<N> {
 
         Ok(corrected_roots)
     }
+
+    // Pad to the smallest power of two less than or equal to size
+    fn pad_power_of_two(&mut self, size: usize) {
+        let mut power: usize = 1;
+        while power < size {
+            power <<= 1;
+        }
+        while self.coefficients.len() < power {
+            self.coefficients.push(N::zero());
+        }
+    }
+
+    /// Get the polynomial in point form evaluated at roots of unity at k points
+    /// where k is the smallest power of 2 greater than or equal to size
+    pub fn dft(&self, size: usize) -> Vec<Complex<<N as ComplexField>::RealField>> {
+        let mut poly = self.make_complex();
+        poly.pad_power_of_two(size);
+        let mut working = bit_reverse_copy(&poly.coefficients);
+        let len = working.len();
+        for s in 1..(len as f64).log2() as usize + 1 {
+            let m = 1 << s;
+            let angle = f64::consts::TAU / m as f64;
+            let angle = N::RealField::from_f64(angle).unwrap();
+            let root_of_unity = Complex::<N::RealField>::new(angle.cos(), angle.sin());
+            let mut w = Complex::<N::RealField>::new(N::RealField::one(), N::RealField::zero());
+            for j in 0..m / 2 {
+                for k in (j..len).step_by(m) {
+                    let temp = w * working[k + m / 2];
+                    let u = working[k];
+                    working[k] = u + temp;
+                    working[k + m / 2] = u - temp;
+                }
+                w *= root_of_unity;
+            }
+        }
+        working
+    }
+
+    // Assumes power of 2
+    pub fn idft(
+        vec: &[Complex<<N as ComplexField>::RealField>],
+        tol: <N as ComplexField>::RealField,
+    ) -> Self {
+        let mut working = bit_reverse_copy(vec);
+        let len = working.len();
+        for s in 1..(len as f64).log2() as usize + 1 {
+            let m = 1 << s;
+            let angle = -f64::consts::TAU / m as f64;
+            let angle = N::RealField::from_f64(angle).unwrap();
+            let root_of_unity = Complex::<N::RealField>::new(angle.cos(), angle.sin());
+            let mut w = Complex::<N::RealField>::new(N::RealField::one(), N::RealField::zero());
+            for j in 0..m / 2 {
+                for k in (j..len).step_by(m) {
+                    let temp = w * working[k + m / 2];
+                    let u = working[k];
+                    working[k] = u + temp;
+                    working[k + m / 2] = u - temp;
+                }
+                w *= root_of_unity;
+            }
+        }
+        let ilen = Complex::<N::RealField>::new(
+            N::from_f64(1.0 / len as f64).unwrap().real(),
+            N::zero().real(),
+        );
+        for val in &mut working {
+            *val *= ilen;
+        }
+        let coefficients = if TypeId::of::<N::RealField>() == TypeId::of::<N>() {
+            working
+                .iter()
+                .map(|c| N::from_real(c.re))
+                .collect::<Vec<_>>()
+        } else {
+            working
+                .iter()
+                .map(|c| {
+                    N::from_real(c.re) + N::from_f64(-1.0).unwrap().sqrt() * N::from_real(c.im)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let mut poly = Polynomial {
+            coefficients,
+            tolerance: tol,
+        };
+        poly.purge_leading();
+        poly
+    }
+}
+
+fn bit_reverse(mut k: usize, num_bits: usize) -> usize {
+    let mut result: usize = 0;
+    for _ in 0..num_bits {
+        result |= k & 1;
+        result <<= 1;
+        k >>= 1;
+    }
+    result >>= 1;
+    result
+}
+
+// Assumes vec is a power of 2 length
+fn bit_reverse_copy<N: RealField>(vec: &[Complex<N>]) -> Vec<Complex<N>> {
+    let len = vec.len();
+    let mut result = vec![Complex::new(N::zero(), N::zero()); len];
+    let num_bits = (len as f64).log2() as usize;
+    for k in 0..len {
+        result[bit_reverse(k, num_bits)] = vec[k];
+    }
+    result
 }
 
 impl<N: ComplexField> FromIterator<N> for Polynomial<N> {
     fn from_iter<I: IntoIterator<Item = N>>(iter: I) -> Polynomial<N> {
         Polynomial {
             coefficients: Vec::from_iter(iter),
+            tolerance: N::RealField::from_f64(1e-10).unwrap(),
         }
     }
 }
@@ -393,7 +539,10 @@ impl<N: ComplexField> ops::Add<N> for &Polynomial<N> {
     fn add(self, rhs: N) -> Polynomial<N> {
         let mut coefficients = Vec::from(self.coefficients.as_slice());
         coefficients[0] += rhs;
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -452,7 +601,10 @@ impl<N: ComplexField> ops::Add<Polynomial<N>> for &Polynomial<N> {
             coefficients.push(*val);
         }
 
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -476,7 +628,10 @@ impl<N: ComplexField> ops::Add<&Polynomial<N>> for &Polynomial<N> {
             coefficients.push(*val);
         }
 
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -527,7 +682,10 @@ impl<N: ComplexField> ops::Sub<N> for &Polynomial<N> {
     fn sub(self, rhs: N) -> Polynomial<N> {
         let mut coefficients = Vec::from(self.coefficients.as_slice());
         coefficients[0] -= rhs;
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -568,7 +726,10 @@ impl<N: ComplexField> ops::Sub<Polynomial<N>> for &Polynomial<N> {
             coefficients.push(-*val);
         }
 
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -609,7 +770,10 @@ impl<N: ComplexField> ops::Sub<&Polynomial<N>> for &Polynomial<N> {
             coefficients.push(-*val);
         }
 
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -664,7 +828,74 @@ impl<N: ComplexField> ops::Mul<N> for &Polynomial<N> {
         for val in &self.coefficients {
             coefficients.push(*val * rhs);
         }
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
+    }
+}
+
+impl<N: ComplexField> ops::Mul<Polynomial<N>> for Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        Polynomial::<N>::idft(&product_points, self.tolerance)
+    }
+}
+
+impl<N: ComplexField> ops::Mul<&Polynomial<N>> for Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        Polynomial::<N>::idft(&product_points, self.tolerance)
+    }
+}
+
+impl<N: ComplexField> ops::Mul<Polynomial<N>> for &Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        Polynomial::<N>::idft(&product_points, self.tolerance)
+    }
+}
+
+impl<N: ComplexField> ops::Mul<&Polynomial<N>> for &Polynomial<N> {
+    type Output = Polynomial<N>;
+
+    fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        Polynomial::<N>::idft(&product_points, self.tolerance)
     }
 }
 
@@ -673,6 +904,34 @@ impl<N: ComplexField> ops::MulAssign<N> for Polynomial<N> {
         for val in self.coefficients.iter_mut() {
             *val *= rhs;
         }
+    }
+}
+
+impl<N: ComplexField> ops::MulAssign<Polynomial<N>> for Polynomial<N> {
+    fn mul_assign(&mut self, rhs: Polynomial<N>) {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        self.coefficients = Polynomial::<N>::idft(&product_points, self.tolerance).coefficients;
+    }
+}
+
+impl<N: ComplexField> ops::MulAssign<&Polynomial<N>> for Polynomial<N> {
+    fn mul_assign(&mut self, rhs: &Polynomial<N>) {
+        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
+        let self_points = self.dft(bound);
+        let rhs_points = rhs.dft(bound);
+        let product_points: Vec<_> = self_points
+            .iter()
+            .zip(rhs_points.iter())
+            .map(|(s_p, r_p)| *s_p * *r_p)
+            .collect();
+        self.coefficients = Polynomial::<N>::idft(&product_points, self.tolerance).coefficients;
     }
 }
 
@@ -695,7 +954,10 @@ impl<N: ComplexField> ops::Div<N> for &Polynomial<N> {
         for val in &mut coefficients {
             *val /= rhs;
         }
-        Polynomial { coefficients }
+        Polynomial {
+            coefficients,
+            tolerance: self.tolerance,
+        }
     }
 }
 
@@ -724,6 +986,7 @@ impl<N: ComplexField> ops::Neg for &Polynomial<N> {
     fn neg(self) -> Polynomial<N> {
         Polynomial {
             coefficients: Vec::from_iter(self.coefficients.iter().map(|c| -*c)),
+            tolerance: self.tolerance,
         }
     }
 }

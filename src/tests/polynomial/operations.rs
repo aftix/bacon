@@ -291,6 +291,119 @@ fn polynomial_multiplication() {
         poly.set_coefficient(1, 6.0);
         poly.set_coefficient(2, 4.0);
     }
+
+    let poly = polynomial![1.0, 0.0, -1.0];
+    let poly_2 = polynomial![1.0, 0.0];
+    let product = &poly * &poly_2;
+    assert_eq!(product.order(), 3);
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(1),
+        -1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(2),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(3),
+        1.0,
+        epsilon = 0.000001
+    ));
+    let poly = polynomial![1.0, 0.0, -1.0];
+    let poly_2 = polynomial![1.0, 0.0];
+    let product = poly * &poly_2;
+    assert_eq!(product.order(), 3);
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(1),
+        -1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(2),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(3),
+        1.0,
+        epsilon = 0.000001
+    ));
+    let poly = polynomial![1.0, 0.0, -1.0];
+    let poly_2 = polynomial![1.0, 0.0];
+    let product = &poly * poly_2;
+    assert_eq!(product.order(), 3);
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(1),
+        -1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(2),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(3),
+        1.0,
+        epsilon = 0.000001
+    ));
+    let poly = polynomial![1.0, 0.0, -1.0];
+    let poly_2 = polynomial![1.0, 0.0];
+    let product = poly * poly_2;
+    assert_eq!(product.order(), 3);
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(1),
+        -1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(2),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        product.get_coefficient(3),
+        1.0,
+        epsilon = 0.000001
+    ));
 }
 
 #[test]

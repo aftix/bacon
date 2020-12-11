@@ -1,4 +1,4 @@
-mod operations;
+use crate::polynomial::Polynomial;
 
 #[test]
 fn polynomial_evaluation() {
@@ -131,4 +131,39 @@ fn polynomial_integrate() {
     polynomial = polynomial![1.0, 0.0, -3.0, 0.0];
     let area = polynomial.integrate(-2.0, 8.0);
     assert!(approx_eq!(f64, area, 930.0, epsilon = 0.00001))
+}
+
+#[test]
+fn polynomial_fft() {
+    let poly = polynomial![1.0, 0.0, -1.0];
+    let fft = poly.dft(3);
+    assert_eq!(fft.len(), 4);
+    assert!(approx_eq!(f64, fft[0].re, 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[0].im, 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[1].re, -2.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[1].im, 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[2].re, 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[2].im, 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[3].re, -2.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, fft[3].im, 0.0, epsilon = 0.0001));
+    let poly = Polynomial::<f64>::idft(&fft, 1e-10);
+    assert_eq!(poly.order(), 2);
+    assert!(approx_eq!(
+        f64,
+        poly.get_coefficient(2),
+        1.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        poly.get_coefficient(1),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        poly.get_coefficient(0),
+        -1.0,
+        epsilon = 0.000001
+    ));
 }
