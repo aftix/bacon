@@ -3,6 +3,8 @@ name = "bacon"
 version = "0.1.0"
 authors = ["aftix <aftix@aftix.xyz>"]
 edition = "2018"
+license="MIT"
+description="Scientific computing in Rust"
 
 [features]
 serialize=["serde"]
