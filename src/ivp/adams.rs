@@ -95,7 +95,7 @@ type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{AdamsBashforth,adams};
+/// use bacon_sci::ivp::{AdamsBashforth,adams};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }
@@ -322,7 +322,7 @@ pub fn adams<S: AdamsSolver, T: Clone>(
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{adams,AdamsBashforth};
+/// use bacon_sci::ivp::{adams,AdamsBashforth};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }
@@ -398,7 +398,7 @@ impl<N: ComplexField + From<f64> + Copy> AdamsSolver for AdamsBashforth<N> {
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{adams,PredictorCorrector};
+/// use bacon_sci::ivp::{adams,PredictorCorrector};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }

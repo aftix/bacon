@@ -31,7 +31,7 @@ pub use polynomial::*;
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::roots::bisection;
+/// use bacon_sci::roots::bisection;
 ///
 /// fn cubic(x: f64) -> f64 {
 ///   x*x*x
@@ -108,7 +108,7 @@ pub fn bisection<N: RealField>(
 ///
 /// # Examples
 /// ```
-/// use bacon::roots::steffensen;
+/// use bacon_sci::roots::steffensen;
 /// fn cosine(x: f64) -> f64 {
 ///   x.cos()
 /// }
@@ -164,7 +164,7 @@ pub fn steffensen<N: RealField + From<f64> + Copy>(
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::roots::newton;
+/// use bacon_sci::roots::newton;
 /// fn cubic(x: &[f64]) -> DVector<f64> {
 ///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
 /// }
@@ -237,10 +237,9 @@ pub fn newton<N: ComplexField>(
 /// `n_max` Maximum number of iterations
 ///
 /// # Examples
-///
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::roots::secant;
+/// use bacon_sci::roots::secant;
 /// fn cubic(x: &[f64]) -> DVector<f64> {
 ///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
 /// }

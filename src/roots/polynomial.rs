@@ -22,8 +22,8 @@ use num_traits::{FromPrimitive, Zero};
 ///
 /// # Examples
 /// ```
-/// use bacon::polynomial::Polynomial;
-/// use bacon::roots::newton_polynomial;
+/// use bacon_sci::polynomial::Polynomial;
+/// use bacon_sci::roots::newton_polynomial;
 /// fn example() {
 ///   let mut polynomial = Polynomial::new();
 ///   polynomial.set_coefficient(2, 1.0);
@@ -80,8 +80,8 @@ pub fn newton_polynomial<N: ComplexField>(
 /// `n_max` Maximum number of iterations
 /// # Examples
 /// ```
-/// use bacon::polynomial::Polynomial;
-/// use bacon::roots::muller_polynomial;
+/// use bacon_sci::polynomial::Polynomial;
+/// use bacon_sci::roots::muller_polynomial;
 /// fn example() {
 ///   let mut polynomial = Polynomial::new();
 ///   polynomial.set_coefficient(2, 1.0);

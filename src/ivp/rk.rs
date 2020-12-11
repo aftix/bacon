@@ -92,7 +92,7 @@ type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 ///
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{RungeKutta, runge_kutta};
+/// use bacon_sci::ivp::{RungeKutta, runge_kutta};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }
@@ -174,7 +174,7 @@ pub fn runge_kutta<S: RungeKuttaSolver, T: Clone>(
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{RungeKutta, runge_kutta};
+/// use bacon_sci::ivp::{RungeKutta, runge_kutta};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }
@@ -284,7 +284,7 @@ impl<N: ComplexField + From<f64> + Copy> RungeKuttaSolver for RungeKutta<N> {
 /// # Examples
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::{runge_kutta, RungeKuttaFehlberg};
+/// use bacon_sci::ivp::{runge_kutta, RungeKuttaFehlberg};
 /// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
 /// }

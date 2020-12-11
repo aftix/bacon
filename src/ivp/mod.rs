@@ -37,7 +37,7 @@ pub use rk::*;
 ///
 /// ```
 /// use nalgebra::DVector;
-/// use bacon::ivp::euler;
+/// use bacon_sci::ivp::euler;
 /// // Derivative of y_i = exp(y_i)
 /// fn derivative(_t: f64, y: &[f64], _: &mut ()) -> DVector<f64> {
 ///   DVector::from_column_slice(y)
