@@ -4,483 +4,373 @@
  * See repository LICENSE for information.
  */
 
+use super::{IVPSolver, IVPStatus};
 use alga::general::{ComplexField, RealField};
 use nalgebra::DVector;
+use num_traits::{FromPrimitive, Zero};
 
 /// This trait allows a struct to be used in the Runge-Kutta solver.
 ///
 /// # Examples
 /// See `struct RungeKutta` and `struct RungeKuttaFehlberg` for examples of implementing
 /// this trait.
-pub trait RungeKuttaSolver {
-    type Complex: ComplexField + From<f64>;
-
+pub trait RungeKuttaSolver<N: ComplexField>: Sized {
     /// Returns a slice of coeffecients to multiply the time step by when getting
     /// intermediate results. Upper-left portion of Butch Tableaux
-    fn t_coefficients() -> Vec<<Self::Complex as ComplexField>::RealField>;
+    fn t_coefficients() -> Vec<N::RealField>;
 
     /// Returns the coefficients to use on the k_i's when finding another
     /// k_i. Upper-right portion of the Butch Tableax. Should be
     /// an NxN-1 matrix, where N is the order of the Runge-Kutta Method (Or order+1 for
     /// adaptive methods)
-    fn k_coefficients() -> Vec<Vec<<Self::Complex as ComplexField>::RealField>>;
+    fn k_coefficients() -> Vec<Vec<N::RealField>>;
 
     /// Coefficients to use when calculating the final step to take.
     /// These are the weights of the weighted average of k_i's. Bottom
     /// portion of the Butch Tableaux. For adaptive methods, this is the first
     /// row of the bottom portion.
-    fn avg_coefficients() -> Vec<<Self::Complex as ComplexField>::RealField>;
+    fn avg_coefficients() -> Vec<N::RealField>;
 
     /// Used for adaptive methods only. Coefficients to use on
     /// the k_i's to find the error between the two orders
     /// of Runge-Kutta methods. In the Butch Tableaux, this is
     /// the first row of the bottom portion minus the second row.
-    fn error_coefficients() -> Vec<<Self::Complex as ComplexField>::RealField> {
-        vec![Self::Complex::from(0.0).real()]
-    }
+    fn error_coefficients() -> Vec<N::RealField>;
 
-    /// Return this method's current time step
-    fn dt(&self) -> <Self::Complex as ComplexField>::RealField;
-
-    /// Returns whether or not this method is adaptive
-    fn adaptive() -> bool {
-        false
-    }
-
-    /// Used for adaptive solvers to update the timestep based on
-    /// the current error.
-    ///
-    /// # Returns
-    /// Returns Ok(true) if this step should be accepted, Ok(false) if this step
-    /// should be rejected, and Err if the timestep became less than the minimum value.
-    fn update_dt(
+    fn solve_ivp<T: Clone>(
         &mut self,
-        _error: <Self::Complex as ComplexField>::RealField,
-    ) -> Result<bool, String> {
-        Ok(true)
+        f: super::DerivativeFunc<N, N::RealField, T>,
+        params: &mut T,
+    ) -> super::Path<N, N::RealField>;
+}
+
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(serialize, derive(Serialize, Deserialize))]
+pub struct RKInfo<N: ComplexField> {
+    dt: Option<N::RealField>,
+    time: Option<N::RealField>,
+    end: Option<N::RealField>,
+    state: Option<DVector<N>>,
+    dt_max: Option<N::RealField>,
+    dt_min: Option<N::RealField>,
+    tolerance: Option<N::RealField>,
+    a_coefficients: Vec<N::RealField>,
+    k_coefficients: Vec<Vec<N::RealField>>,
+    avg_coefficients: Vec<N::RealField>,
+    error_coefficients: Vec<N::RealField>,
+}
+
+impl<N: ComplexField> RKInfo<N> {
+    fn new() -> Self {
+        RKInfo {
+            dt: None,
+            time: None,
+            end: None,
+            state: None,
+            dt_max: None,
+            dt_min: None,
+            tolerance: None,
+            a_coefficients: vec![],
+            k_coefficients: vec![],
+            avg_coefficients: vec![],
+            error_coefficients: vec![],
+        }
     }
 }
 
-type DerivativeFunc<Complex, Real, T> = fn(Real, &[Complex], &mut T) -> DVector<Complex>;
-type ReturnType<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
-/// Use a Runge-Kutta method to solve an initial value problem.
-///
-/// This function takes a Runge-Kutta solver, adaptive or not,
-/// and solves an initial value problem defined by `y_0` as the initial
-/// value and `derivs` as the derivative function.
-///
-/// # Return
-/// On success, an `Ok(vec)` where `vec` is a vector of steps
-/// of the form `(t_n, y_n)` with y_n being a vector equal in
-/// dimension to `y_0`.
-///
-/// # Params
-/// `solver` A solver implementing `RungeKuttaSolver`
-///
-/// `(t_initial, t_final)` Interval to solve the initial value problem on
-///
-/// `y_0` initial values for the ivp
-///
-/// `derivs` Derivative function. Should take the arguments `(time, slice of all y_n's, params)` where
-/// y_n is the value of the initial value problem at time `time`.
-///
-/// `params` Mutable reference to a type that implements `Clone`. `params` is cloned
-/// for all intermediate steps done by the solver so that `derivs` at `t_n+1` gets
-/// the params passed from `derivs` at `t_n`, not some intermediate `k` step.
-///
-/// # Examples
-///
-/// ```
-/// use nalgebra::DVector;
-/// use bacon_sci::ivp::{RungeKutta, runge_kutta};
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_column_slice(y)
-/// }
-///
-/// //...
-/// fn example() -> Result<(), String> {
-///   let rk = RungeKutta::default().with_dt(0.01)?.build()?;
-///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ());
-///   Ok(())
-/// }
-/// ```
-pub fn runge_kutta<S: RungeKuttaSolver, T: Clone>(
-    mut solver: S,
-    (t_initial, t_final): (
-        <S::Complex as ComplexField>::RealField,
-        <S::Complex as ComplexField>::RealField,
-    ),
-    y_0: &[S::Complex],
-    derivs: DerivativeFunc<S::Complex, <S::Complex as ComplexField>::RealField, T>,
-    params: &mut T,
-) -> ReturnType<S::Complex, <S::Complex as ComplexField>::RealField> {
-    let mut state = DVector::from_column_slice(y_0);
-    let mut path = vec![(t_initial, state.clone())];
+impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
+    fn step<T: Clone>(
+        &mut self,
+        f: super::DerivativeFunc<N, N::RealField, T>,
+        params: &mut T,
+    ) -> Result<IVPStatus<N>, String> {
+        if self.time.unwrap() >= self.end.unwrap() {
+            return Ok(IVPStatus::Done);
+        }
 
-    let num_k = S::avg_coefficients().len();
+        let mut set_dt = false;
+        if self.time.unwrap() + self.dt.unwrap() >= self.end.unwrap() {
+            set_dt = true;
+            self.dt = Some(self.end.unwrap() - self.time.unwrap());
+        }
 
-    let mut time = t_initial;
+        let num_k = self.k_coefficients.len();
 
-    while time < t_final {
-        let old_params = params.clone();
-        let mut k: Vec<DVector<S::Complex>> = vec![];
-
-        let mut new_params = old_params.clone();
-        for ind in 0..num_k {
-            state = path.last().unwrap().1.clone();
-            for (j, k) in k.iter().enumerate() {
-                state += k * S::Complex::from_real(S::k_coefficients()[ind][j]);
+        let mut half_steps: Vec<DVector<N>> = Vec::with_capacity(num_k);
+        for i in 0..num_k {
+            let mut state = self.state.as_ref().unwrap().clone();
+            for (j, k) in half_steps.iter().enumerate() {
+                state += k * N::from_real(self.k_coefficients[i][j]);
             }
-            k.push(
-                derivs(
-                    time + S::t_coefficients()[ind] * solver.dt(),
+            half_steps.push(
+                f(
+                    self.time.unwrap() + self.a_coefficients[i] * self.dt.unwrap(),
                     state.column(0).as_slice(),
-                    params,
-                ) * S::Complex::from_real(solver.dt()),
+                    &mut params.clone(),
+                )? * N::from_real(self.dt.unwrap()),
             );
-            if ind == 0 {
-                new_params = params.clone();
+        }
+
+        let mut error_vec = half_steps[0].clone() * N::from_real(self.error_coefficients[0]);
+        for (ind, k) in half_steps.iter().enumerate().skip(1) {
+            error_vec += k * N::from_real(self.error_coefficients[ind]);
+        }
+        let error = error_vec.dot(&error_vec).real() / self.dt.unwrap();
+
+        let mut output = false;
+        if error <= self.tolerance.unwrap() {
+            output = true;
+            *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
+            for (ind, k) in half_steps.iter().enumerate() {
+                *self
+                    .state
+                    .get_or_insert(DVector::from_column_slice(&[N::zero()])) +=
+                    k * N::from_real(self.avg_coefficients[ind]);
             }
-            *params = old_params.clone();
-        }
-        *params = new_params.clone();
-
-        state = path.last().unwrap().1.clone();
-        for (ind, k) in k.iter().enumerate() {
-            state += k * S::Complex::from_real(S::avg_coefficients()[ind]);
         }
 
-        let mut error: <S::Complex as ComplexField>::RealField = S::Complex::from(0.0).real();
-        if S::adaptive() {
-            let mut error_vec = k[0].clone() * S::Complex::from_real(S::error_coefficients()[0]);
-            for (ind, k) in k.iter().enumerate().skip(1) {
-                error_vec += k * S::Complex::from_real(S::error_coefficients()[ind]);
-            }
-            error = error_vec.dot(&error_vec).real() / solver.dt();
+        let delta = N::RealField::from_f64(0.84).unwrap()
+            * (self.tolerance.unwrap() / error).powf(N::RealField::from_f64(0.25).unwrap());
+        if delta <= N::RealField::from_f64(0.1).unwrap() {
+            *self.dt.get_or_insert(N::RealField::zero()) *= N::RealField::from_f64(0.1).unwrap();
+        } else if delta >= N::RealField::from_f64(4.0).unwrap() {
+            *self.dt.get_or_insert(N::RealField::zero()) *= N::RealField::from_f64(4.0).unwrap();
+        } else {
+            *self.dt.get_or_insert(N::RealField::zero()) *= delta;
         }
 
-        let old_dt = solver.dt();
-        if solver.update_dt(error)? {
-            time += old_dt;
-            path.push((time, state.clone()));
+        if self.dt.unwrap() > self.dt_max.unwrap() {
+            self.dt = Some(self.dt_max.unwrap());
+        }
+
+        if !set_dt && self.dt.unwrap() < self.dt_min.unwrap() {
+            return Err("RKInfo step: minimum dt exceeded".to_owned());
+        }
+
+        if output {
+            Ok(IVPStatus::Ok((
+                self.time.unwrap(),
+                self.state.as_ref().unwrap().clone(),
+            )))
+        } else {
+            Ok(IVPStatus::Redo)
         }
     }
 
-    Ok(path)
-}
-
-/// Solver for the fourth order Runge-Kutta method
-///
-/// # Examples
-/// ```
-/// use nalgebra::DVector;
-/// use bacon_sci::ivp::{RungeKutta, runge_kutta};
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_column_slice(y)
-/// }
-/// //...
-/// fn example() -> Result<(), String>{
-///   let rk = RungeKutta::default().with_dt(0.01)?.build()?;
-///   let path = runge_kutta(rk, (0.0, 1.0), &[1.0], derivatives, &mut ())?;
-///   Ok(())
-/// }
-/// ```
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct RungeKutta<N: ComplexField + From<f64> + Copy> {
-    dt: <N as ComplexField>::RealField,
-}
-
-/// Builds a RungeKutta solver
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct RungeKuttaBuilder<N: ComplexField + From<f64> + Copy> {
-    solver: RungeKutta<N>,
-}
-
-impl<N: ComplexField + From<f64> + Copy> RungeKutta<N> {
-    /// Get a builder to make a RungeKutta solver
-    pub fn default() -> RungeKuttaBuilder<N> {
-        RungeKuttaBuilder {
-            solver: RungeKutta {
-                dt: N::from(0.01).real(),
-            },
-        }
-    }
-}
-
-impl<N: ComplexField + From<f64> + Copy> RungeKuttaBuilder<N> {
-    /// Make a RungeKutta solver out of this builder
-    pub fn build(self) -> Result<RungeKutta<N>, String> {
-        Ok(self.solver)
-    }
-
-    /// Set the timestep for the RungeKutta solver
-    pub fn with_dt(
-        &mut self,
-        dt: <N as ComplexField>::RealField,
-    ) -> Result<&mut RungeKuttaBuilder<N>, String> {
-        if dt <= N::from(0.0).real() {
-            return Err("RungeKuttaBuilder: dt must be positive".to_owned());
-        }
-        self.solver.dt = dt;
-        Ok(self)
-    }
-}
-
-impl<N: ComplexField + From<f64> + Copy> RungeKuttaSolver for RungeKutta<N> {
-    type Complex = N;
-
-    fn t_coefficients() -> Vec<<N as ComplexField>::RealField> {
-        vec![
-            N::from(0.0).real(),
-            N::from(0.5).real(),
-            N::from(0.5).real(),
-            N::from(1.0).real(),
-        ]
-    }
-
-    fn k_coefficients() -> Vec<Vec<<N as ComplexField>::RealField>> {
-        vec![
-            vec![
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-            ],
-            vec![
-                N::from(0.5).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-            ],
-            vec![
-                N::from(0.0).real(),
-                N::from(0.5).real(),
-                N::from(0.0).real(),
-            ],
-            vec![
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(1.0).real(),
-            ],
-        ]
-    }
-
-    fn avg_coefficients() -> Vec<<N as ComplexField>::RealField> {
-        vec![
-            N::from(1.0 / 6.0).real(),
-            N::from(1.0 / 3.0).real(),
-            N::from(1.0 / 3.0).real(),
-            N::from(1.0 / 6.0).real(),
-        ]
-    }
-
-    fn dt(&self) -> <N as ComplexField>::RealField {
-        self.dt
-    }
-}
-
-/// Solver for the Runge-Kutta-Fehlberg Solver
-///
-/// # Examples
-/// ```
-/// use nalgebra::DVector;
-/// use bacon_sci::ivp::{runge_kutta, RungeKuttaFehlberg};
-/// fn derivatives(_time: f64, y: &[f64], _params: &mut ()) -> DVector<f64> {
-///   DVector::from_column_slice(y)
-/// }
-/// //...
-/// fn example() -> Result<(), String> {
-///   let rkf = RungeKuttaFehlberg::default().with_dt_min(0.001)?.with_dt_max(0.01)?.with_tolerance(0.01)?.build()?;
-///   let path = runge_kutta(rkf, (0.0, 1.0), &[1.0], derivatives, &mut ())?;
-///   Ok(())
-/// }
-/// ```
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct RungeKuttaFehlberg<N: ComplexField + From<f64> + Copy> {
-    dt: <N as ComplexField>::RealField,
-    dt_min: <N as ComplexField>::RealField,
-    dt_max: <N as ComplexField>::RealField,
-    tolerance: <N as ComplexField>::RealField,
-}
-
-/// Builder for a RungeKuttaFehlberg solver
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct RungeKuttaFehlbergBuilder<N: ComplexField + From<f64> + Copy> {
-    solver: RungeKuttaFehlberg<N>,
-}
-
-impl<N: ComplexField + From<f64> + Copy> RungeKuttaFehlberg<N> {
-    /// Get a builder for a new RungeKuttaFehlberg solver
-    pub fn default() -> RungeKuttaFehlbergBuilder<N> {
-        RungeKuttaFehlbergBuilder {
-            solver: RungeKuttaFehlberg {
-                dt: N::from(0.01).real(),
-                dt_max: N::from(0.1).real(),
-                dt_min: N::from(0.001).real(),
-                tolerance: N::from(0.001).real(),
-            },
-        }
-    }
-}
-
-impl<N: ComplexField + From<f64> + Copy> RungeKuttaFehlbergBuilder<N> {
-    /// Build this RungeKuttaFehlberg solver
-    pub fn build(mut self) -> Result<RungeKuttaFehlberg<N>, String> {
-        if self.solver.dt_min >= self.solver.dt_max {
-            return Err("RungeKuttaFehlbergBuilder: dt_min must be <= dt_max".to_owned());
-        }
-        self.solver.dt = self.solver.dt_max;
-        Ok(self.solver)
-    }
-
-    /// Set the minimum timestep for this solver
-    pub fn with_dt_min(
-        &mut self,
-        dt_min: <N as ComplexField>::RealField,
-    ) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
-        if !dt_min.is_sign_positive() {
-            return Err("RungeKuttaFehlbergBuilder: dt_min must be positive".to_owned());
-        }
-        self.solver.dt_min = dt_min;
-        Ok(self)
-    }
-
-    /// Set the maximum timestep for this solver.
-    pub fn with_dt_max(
-        &mut self,
-        dt_max: <N as ComplexField>::RealField,
-    ) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
-        if !dt_max.is_sign_positive() {
-            return Err("RungeKuttaFehlbergBuilder: dt_max must be positive".to_owned());
-        }
-        self.solver.dt_max = dt_max;
-        Ok(self)
-    }
-
-    /// Set the error tolerance for this solver
-    pub fn with_tolerance(
-        &mut self,
-        tol: <N as ComplexField>::RealField,
-    ) -> Result<&mut RungeKuttaFehlbergBuilder<N>, String> {
+    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
         if !tol.is_sign_positive() {
-            return Err("RungeKuttaFehlbergBuilder: tolerance must be positive".to_owned());
+            return Err("RKInfo with_tolerance: tolerance must be postive".to_owned());
         }
-        self.solver.tolerance = tol;
+        self.tolerance = Some(tol);
+        Ok(self)
+    }
+
+    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
+        if !max.is_sign_positive() {
+            return Err("RKInfo with_dt_max: dt_max must be positive".to_owned());
+        }
+        if let Some(min) = self.dt_min {
+            if max <= min {
+                return Err("RKInfo with_dt_max: dt_max must be greater than dt_min".to_owned());
+            }
+        }
+        self.dt_max = Some(max);
+        self.dt = Some(max);
+        Ok(self)
+    }
+
+    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
+        if !min.is_sign_positive() {
+            return Err("RKInfo with_dt_min: dt_min must be positive".to_owned());
+        }
+        if let Some(max) = self.dt_max {
+            if min >= max {
+                return Err("RKInfo with_dt_min: dt_min must be less than dt_max".to_owned());
+            }
+        }
+        self.dt_min = Some(min);
+        Ok(self)
+    }
+
+    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        if let Some(end) = self.end {
+            if end <= t_initial {
+                return Err("RKInfo with_start: Start must be before end".to_owned());
+            }
+        }
+        self.time = Some(t_initial);
+        Ok(self)
+    }
+
+    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        if let Some(start) = self.time {
+            if t_final <= start {
+                return Err("RKInfo with_end: Start must be before end".to_owned());
+            }
+        }
+        self.end = Some(t_final);
+        Ok(self)
+    }
+
+    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
+        self.state = Some(DVector::from_column_slice(start));
+        Ok(self)
+    }
+
+    fn build(self) -> Self {
+        self
+    }
+
+    fn get_initial_conditions(&self) -> Option<DVector<N>> {
+        if let Some(state) = &self.state {
+            Some(state.clone())
+        } else {
+            None
+        }
+    }
+
+    fn get_time(&self) -> Option<N::RealField> {
+        if let Some(time) = &self.time {
+            Some(*time)
+        } else {
+            None
+        }
+    }
+
+    fn check_start(&self) -> Result<(), String> {
+        if self.time == None {
+            Err("RKInfo check_start: No initial time".to_owned())
+        } else if self.end == None {
+            Err("RKInfo check_start: No end time".to_owned())
+        } else if self.tolerance == None {
+            Err("RKInfo check_start: No tolerance".to_owned())
+        } else if self.state == None {
+            Err("RKInfo check_start: No initial conditions".to_owned())
+        } else if self.dt_max == None {
+            Err("RKInfo check_start: No dt_max".to_owned())
+        } else if self.dt_min == None {
+            Err("RKInfo check_start: No dt_min".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(serialize, derive(Serialize, Deserialize))]
+pub struct RK45<N: ComplexField> {
+    info: RKInfo<N>,
+}
+
+impl<N: ComplexField> RK45<N> {
+    pub fn new() -> Self {
+        let mut info = RKInfo::<N>::new();
+        info.a_coefficients = Self::t_coefficients();
+        info.k_coefficients = Self::k_coefficients();
+        info.avg_coefficients = Self::avg_coefficients();
+        info.error_coefficients = Self::error_coefficients();
+        RK45 { info }
+    }
+
+    pub fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_tolerance(tol)?;
+        Ok(self)
+    }
+
+    pub fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_max(max)?;
+        Ok(self)
+    }
+
+    pub fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_min(min)?;
+        Ok(self)
+    }
+
+    pub fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_start(t_initial)?;
+        Ok(self)
+    }
+
+    pub fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_end(t_final)?;
+        Ok(self)
+    }
+
+    pub fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
+        self.info = self.info.with_initial_conditions(start)?;
         Ok(self)
     }
 }
 
-impl<N: ComplexField + From<f64> + Copy> RungeKuttaSolver for RungeKuttaFehlberg<N> {
-    type Complex = N;
-
-    fn t_coefficients() -> Vec<<N as ComplexField>::RealField> {
+impl<N: ComplexField> RungeKuttaSolver<N> for RK45<N> {
+    fn t_coefficients() -> Vec<N::RealField> {
         vec![
-            N::from(0.0).real(),
-            N::from(0.25).real(),
-            N::from(3.0 / 8.0).real(),
-            N::from(12.0 / 13.0).real(),
-            N::from(1.0).real(),
-            N::from(0.5).real(),
+            N::RealField::from_f64(0.0).unwrap(),
+            N::RealField::from_f64(0.25).unwrap(),
+            N::RealField::from_f64(3.0 / 8.0).unwrap(),
+            N::RealField::from_f64(12.0 / 13.0).unwrap(),
+            N::RealField::from_f64(1.0).unwrap(),
+            N::RealField::from_f64(0.5).unwrap(),
         ]
     }
 
-    fn k_coefficients() -> Vec<Vec<<N as ComplexField>::RealField>> {
+    fn k_coefficients() -> Vec<Vec<N::RealField>> {
         vec![
+            vec![],
+            vec![N::RealField::from_f64(0.25).unwrap()],
             vec![
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
+                N::RealField::from_f64(3.0 / 32.0).unwrap(),
+                N::RealField::from_f64(9.0 / 32.0).unwrap(),
             ],
             vec![
-                N::from(1.0 / 4.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
+                N::RealField::from_f64(1932.0 / 2197.0).unwrap(),
+                N::RealField::from_f64(-7200.0 / 2197.0).unwrap(),
+                N::RealField::from_f64(7296.0 / 2197.0).unwrap(),
             ],
             vec![
-                N::from(3.0 / 32.0).real(),
-                N::from(9.0 / 32.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
+                N::RealField::from_f64(439.0 / 216.0).unwrap(),
+                N::RealField::from_f64(-8.0).unwrap(),
+                N::RealField::from_f64(3680.0 / 513.0).unwrap(),
+                N::RealField::from_f64(-845.0 / 4104.0).unwrap(),
             ],
             vec![
-                N::from(1932.0 / 2197.0).real(),
-                N::from(-7200.0 / 2197.0).real(),
-                N::from(7296.0 / 2197.0).real(),
-                N::from(0.0).real(),
-                N::from(0.0).real(),
-            ],
-            vec![
-                N::from(439.0 / 216.0).real(),
-                N::from(-8.0).real(),
-                N::from(3680.0 / 513.0).real(),
-                N::from(-845.0 / 4104.0).real(),
-                N::from(0.0).real(),
-            ],
-            vec![
-                N::from(-8.0 / 27.0).real(),
-                N::from(2.0).real(),
-                N::from(-3544.0 / 2565.0).real(),
-                N::from(1859.0 / 4104.0).real(),
-                N::from(-11.0 / 40.0).real(),
+                N::RealField::from_f64(-8.0 / 27.0).unwrap(),
+                N::RealField::from_f64(2.0).unwrap(),
+                N::RealField::from_f64(-3544.0 / 2565.0).unwrap(),
+                N::RealField::from_f64(1859.0 / 4104.0).unwrap(),
+                N::RealField::from_f64(-11.0 / 40.0).unwrap(),
             ],
         ]
     }
 
-    fn avg_coefficients() -> Vec<<N as ComplexField>::RealField> {
+    fn avg_coefficients() -> Vec<N::RealField> {
         vec![
-            N::from(25.0 / 216.0).real(),
-            N::from(0.0).real(),
-            N::from(1408.0 / 2565.0).real(),
-            N::from(2197.0 / 4104.0).real(),
-            N::from(-1.0 / 5.0).real(),
-            N::from(0.0).real(),
+            N::RealField::from_f64(25.0 / 216.0).unwrap(),
+            N::RealField::from_f64(0.0).unwrap(),
+            N::RealField::from_f64(1408.0 / 2565.0).unwrap(),
+            N::RealField::from_f64(2197.0 / 4104.0).unwrap(),
+            N::RealField::from_f64(-1.0 / 5.0).unwrap(),
+            N::RealField::from_f64(0.0).unwrap(),
         ]
     }
 
-    fn error_coefficients() -> Vec<<N as ComplexField>::RealField> {
+    fn error_coefficients() -> Vec<N::RealField> {
         vec![
-            N::from(1.0 / 360.0).real(),
-            N::from(0.0).real(),
-            N::from(-128.0 / 4275.0).real(),
-            N::from(-2197.0 / 75240.0).real(),
-            N::from(1.0 / 50.0).real(),
-            N::from(2.0 / 55.0).real(),
+            N::RealField::from_f64(1.0 / 360.0).unwrap(),
+            N::RealField::from_f64(0.0).unwrap(),
+            N::RealField::from_f64(-128.0 / 4275.0).unwrap(),
+            N::RealField::from_f64(-2197.0 / 75240.0).unwrap(),
+            N::RealField::from_f64(1.0 / 50.0).unwrap(),
+            N::RealField::from_f64(2.0 / 55.0).unwrap(),
         ]
     }
 
-    fn dt(&self) -> <N as ComplexField>::RealField {
-        self.dt
-    }
-
-    fn update_dt(&mut self, error: <N as ComplexField>::RealField) -> Result<bool, String> {
-        let delta = N::from(0.84).real() * (self.tolerance / error).powf(N::from(0.25).real());
-        if delta <= N::from(0.1).real() {
-            self.dt *= N::from(0.1).real();
-        } else if delta >= N::from(4.0).real() {
-            self.dt *= N::from(4.0).real();
-        } else {
-            self.dt *= delta;
-        }
-
-        if self.dt > self.dt_max {
-            self.dt = self.dt_max;
-        }
-
-        if self.dt < self.dt_min {
-            Err("RungeKuttaFehlberg: Mininum dt exceeded".to_owned())
-        } else {
-            Ok(error <= self.tolerance)
-        }
-    }
-
-    fn adaptive() -> bool {
-        true
+    fn solve_ivp<T: Clone>(
+        &mut self,
+        f: super::DerivativeFunc<N, N::RealField, T>,
+        params: &mut T,
+    ) -> super::Path<N, N::RealField> {
+        self.info.solve_ivp(f, params)
     }
 }

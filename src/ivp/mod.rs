@@ -15,37 +15,38 @@ pub use rk::*;
 
 pub enum IVPStatus<N: ComplexField> {
     Redo,
-    Ok((<N as ComplexField>::RealField, DVector<N>)),
+    Ok((N::RealField, DVector<N>)),
     Done,
 }
 
-pub trait IVPSolver<N: ComplexField> {
+type DerivativeFunc<Complex, Real, T> =
+    fn(Real, &[Complex], &mut T) -> Result<DVector<Complex>, String>;
+type Path<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
+
+pub trait IVPSolver<N: ComplexField>: Sized {
     fn step<T: Clone>(
         &mut self,
-        f: fn(<N as ComplexField>::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+        f: DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String>;
-    fn with_tolerance(&mut self, tol: <N as ComplexField>::RealField) -> Result<&mut Self, String>;
-    fn with_dt_max(&mut self, max: <N as ComplexField>::RealField) -> Result<&mut Self, String>;
-    fn with_dt_min(&mut self, min: <N as ComplexField>::RealField) -> Result<&mut Self, String>;
-    fn with_start(
-        &mut self,
-        t_initial: <N as ComplexField>::RealField,
-    ) -> Result<&mut Self, String>;
-    fn with_end(&mut self, t_final: <N as ComplexField>::RealField) -> Result<&mut Self, String>;
-    fn build(&self) -> Self;
+    fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
+    fn with_dt_max(self, max: N::RealField) -> Result<Self, String>;
+    fn with_dt_min(self, min: N::RealField) -> Result<Self, String>;
+    fn with_start(self, t_initial: N::RealField) -> Result<Self, String>;
+    fn with_end(self, t_final: N::RealField) -> Result<Self, String>;
+    fn with_initial_conditions(self, start: &[N]) -> Result<Self, String>;
+    fn build(self) -> Self;
 
-    fn with_initial_conditions(&mut self, start: &[N]) -> Result<&mut Self, String>;
     fn get_initial_conditions(&self) -> Option<DVector<N>>;
-    fn get_time(&self) -> Option<<N as ComplexField>::RealField>;
+    fn get_time(&self) -> Option<N::RealField>;
     // Make sure we have t_initial, t_final, dt, initial conditions
     fn check_start(&self) -> Result<(), String>;
 
     fn solve_ivp<T: Clone>(
         &mut self,
-        f: fn(<N as ComplexField>::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+        f: DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
-    ) -> Result<Vec<(<N as ComplexField>::RealField, DVector<N>)>, String> {
+    ) -> Path<N, N::RealField> {
         self.check_start()?;
         let mut path = vec![];
         let init_conditions = self.get_initial_conditions();
@@ -68,9 +69,9 @@ pub trait IVPSolver<N: ComplexField> {
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(serialize, derive(Serialize, Deserialize))]
 pub struct Euler<N: ComplexField> {
-    dt: Option<<N as ComplexField>::RealField>,
-    time: Option<<N as ComplexField>::RealField>,
-    end: Option<<N as ComplexField>::RealField>,
+    dt: Option<N::RealField>,
+    time: Option<N::RealField>,
+    end: Option<N::RealField>,
     state: Option<DVector<N>>,
 }
 
@@ -88,7 +89,7 @@ impl<N: ComplexField> Euler<N> {
 impl<N: ComplexField> IVPSolver<N> for Euler<N> {
     fn step<T: Clone>(
         &mut self,
-        f: fn(<N as ComplexField>::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+        f: DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time >= self.end {
@@ -115,42 +116,46 @@ impl<N: ComplexField> IVPSolver<N> for Euler<N> {
         )))
     }
 
-    fn with_tolerance(
-        &mut self,
-        _tol: <N as ComplexField>::RealField,
-    ) -> Result<&mut Self, String> {
+    fn with_tolerance(self, _tol: N::RealField) -> Result<Self, String> {
         Ok(self)
     }
 
-    fn with_dt_max(&mut self, max: <N as ComplexField>::RealField) -> Result<&mut Self, String> {
+    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
         self.dt = Some(max);
         Ok(self)
     }
 
-    fn with_dt_min(&mut self, _min: <N as ComplexField>::RealField) -> Result<&mut Self, String> {
+    fn with_dt_min(self, _min: N::RealField) -> Result<Self, String> {
         Ok(self)
     }
 
-    fn with_start(
-        &mut self,
-        t_initial: <N as ComplexField>::RealField,
-    ) -> Result<&mut Self, String> {
+    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        if let Some(end) = self.end {
+            if end <= t_initial {
+                return Err("Euler with_end: Start must be after end".to_owned());
+            }
+        }
         self.time = Some(t_initial);
         Ok(self)
     }
 
-    fn with_end(&mut self, t_final: <N as ComplexField>::RealField) -> Result<&mut Self, String> {
+    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        if let Some(start) = self.time {
+            if start >= t_final {
+                return Err("Euler with_end: Start must be after end".to_owned());
+            }
+        }
         self.end = Some(t_final);
         Ok(self)
     }
 
-    fn with_initial_conditions(&mut self, start: &[N]) -> Result<&mut Self, String> {
+    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
         self.state = Some(DVector::from_column_slice(start));
         Ok(self)
     }
 
-    fn build(&self) -> Self {
-        self.clone()
+    fn build(self) -> Self {
+        self
     }
 
     fn get_initial_conditions(&self) -> Option<DVector<N>> {
@@ -161,7 +166,7 @@ impl<N: ComplexField> IVPSolver<N> for Euler<N> {
         }
     }
 
-    fn get_time(&self) -> Option<<N as ComplexField>::RealField> {
+    fn get_time(&self) -> Option<N::RealField> {
         self.time
     }
 
