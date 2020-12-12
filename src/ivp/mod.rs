@@ -13,6 +13,7 @@ pub mod rk;
 pub use adams::*;
 pub use rk::*;
 
+/// Status of an IVP Solver after a step
 pub enum IVPStatus<N: ComplexField> {
     Redo,
     Ok((N::RealField, DVector<N>)),
@@ -23,27 +24,43 @@ type DerivativeFunc<Complex, Real, T> =
     fn(Real, &[Complex], &mut T) -> Result<DVector<Complex>, String>;
 type Path<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 
+/// Trait defining what it means to be an IVP solver.
+/// solve_ivp is automatically implemented based on your step implementation.
 pub trait IVPSolver<N: ComplexField>: Sized {
+    /// Step forward in the solver. Returns if the solver is finished, produced
+    /// an acceptable state, or needs to be redone.
     fn step<T: Clone>(
         &mut self,
         f: DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String>;
+    /// Set the error tolerance for this solver.
     fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
+    /// Set the maximum time step for this solver.
     fn with_dt_max(self, max: N::RealField) -> Result<Self, String>;
+    /// Set the minimum time step for this solver.
     fn with_dt_min(self, min: N::RealField) -> Result<Self, String>;
+    /// Set the initial time for this solver.
     fn with_start(self, t_initial: N::RealField) -> Result<Self, String>;
+    /// Set the end time for this solver.
     fn with_end(self, t_final: N::RealField) -> Result<Self, String>;
+    /// Set the initial conditions for this solver.
     fn with_initial_conditions(self, start: &[N]) -> Result<Self, String>;
+    /// Build this solver.
     fn build(self) -> Self;
 
+    /// Return the initial conditions. Called once at the very start
+    /// of solving.
     fn get_initial_conditions(&self) -> Option<DVector<N>>;
+    /// Get the current time of the solver.
     fn get_time(&self) -> Option<N::RealField>;
-    // Make sure we have t_initial, t_final, dt, initial conditions
+    /// Make sure that every value that needs to be set
+    /// is set before the solver starts
     fn check_start(&self) -> Result<(), String>;
 
+    /// Solve an initial value problem, consuming the solver
     fn solve_ivp<T: Clone>(
-        &mut self,
+        mut self,
         f: DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> Path<N, N::RealField> {
@@ -66,6 +83,33 @@ pub trait IVPSolver<N: ComplexField>: Sized {
     }
 }
 
+/// Euler solver for an IVP.
+///
+/// Solves an initial value problem using Euler's method.
+///
+/// # Examples
+/// ```
+/// use nalgebra::DVector;
+/// use bacon_sci::ivp::{Euler, IVPSolver};
+/// fn derivative(_t: f64, state: &[f64], _p: &mut ()) -> Result<DVector<f64>, String> {
+///     Ok(DVector::from_column_slice(state))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let solver = Euler::new()
+///         .with_dt_max(0.001)?
+///         .with_initial_conditions(&[1.0])?
+///         .with_start(0.0)?
+///         .with_end(1.0)?
+///         .build();
+///     let path = solver.solve_ivp(derivative, &mut ())?;
+///
+///     for (time, state) in &path {
+///         assert!((time.exp() - state.column(0)[0]).abs() <= 0.001);
+///     }
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(serialize, derive(Serialize, Deserialize))]
 pub struct Euler<N: ComplexField> {

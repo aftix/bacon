@@ -11,11 +11,15 @@ use num_traits::{FromPrimitive, Zero};
 
 /// This trait allows a struct to be used in the Runge-Kutta solver.
 ///
+/// Things implementing RungeKuttaSolver should have an RKInfo to handle
+/// the actual IVP solving. It should also provide the with_* helper functions
+/// for convience.
+///
 /// # Examples
 /// See `struct RungeKutta` and `struct RungeKuttaFehlberg` for examples of implementing
 /// this trait.
 pub trait RungeKuttaSolver<N: ComplexField>: Sized {
-    /// Returns a slice of coeffecients to multiply the time step by when getting
+    /// Returns a vec of coeffecients to multiply the time step by when getting
     /// intermediate results. Upper-left portion of Butch Tableaux
     fn t_coefficients() -> Vec<N::RealField>;
 
@@ -31,20 +35,39 @@ pub trait RungeKuttaSolver<N: ComplexField>: Sized {
     /// row of the bottom portion.
     fn avg_coefficients() -> Vec<N::RealField>;
 
-    /// Used for adaptive methods only. Coefficients to use on
+    /// Coefficients to use on
     /// the k_i's to find the error between the two orders
     /// of Runge-Kutta methods. In the Butch Tableaux, this is
     /// the first row of the bottom portion minus the second row.
     fn error_coefficients() -> Vec<N::RealField>;
 
+    /// Ideally, call RKInfo.solve_ivp
     fn solve_ivp<T: Clone>(
-        &mut self,
+        self,
         f: super::DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> super::Path<N, N::RealField>;
+
+    /// Set the error tolerance for this solver.
+    fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
+    /// Set the maximum time step for this solver.
+    fn with_dt_max(self, max: N::RealField) -> Result<Self, String>;
+    /// Set the minimum time step for this solver.
+    fn with_dt_min(self, min: N::RealField) -> Result<Self, String>;
+    /// Set the initial time for this solver.
+    fn with_start(self, t_initial: N::RealField) -> Result<Self, String>;
+    /// Set the end time for this solver.
+    fn with_end(self, t_final: N::RealField) -> Result<Self, String>;
+    /// Set the initial conditions for this solver.
+    fn with_initial_conditions(self, start: &[N]) -> Result<Self, String>;
+    /// Build this solver.
+    fn build(self) -> Self;
 }
 
-#[derive(Debug, Clone, Default)]
+/// Provides an IVPSolver implementation for RungeKuttaSolver,
+/// based entirely on the Butch Tableaux coefficients. It is up
+/// to the RungeKuttaSolver to set up RKInfo. See RK45 for an example.
+#[derive(Debug, Clone)]
 #[cfg_attr(serialize, derive(Serialize, Deserialize))]
 pub struct RKInfo<N: ComplexField> {
     dt: Option<N::RealField>,
@@ -75,6 +98,12 @@ impl<N: ComplexField> RKInfo<N> {
             avg_coefficients: vec![],
             error_coefficients: vec![],
         }
+    }
+}
+
+impl<N: ComplexField> Default for RKInfo<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -256,6 +285,36 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
     }
 }
 
+/// Runge-Kutta-Fehlberg method for solving an IVP.
+///
+/// Defines the Butch Tableaux for a 5(4) order adaptive
+/// runge-kutta method. Uses RKInfo to do the actual solving.
+/// Provides an interface for setting the conditions on RKInfo.
+///
+/// # Examples
+/// ```
+/// use nalgebra::DVector;
+/// use bacon_sci::ivp::{IVPSolver, RK45, RungeKuttaSolver};
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<DVector<f64>, String> {
+///     Ok(DVector::from_column_slice(state))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let rk45 = RK45::new()
+///         .with_dt_max(0.1)?
+///         .with_dt_min(0.001)?
+///         .with_start(0.0)?
+///         .with_end(10.0)?
+///         .with_tolerance(0.0001)?
+///         .with_initial_conditions(&[1.0])?
+///         .build();
+///     let path = rk45.solve_ivp(derivatives, &mut ())?;
+///     for (time, state) in &path {
+///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
+///     }
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone)]
 #[cfg_attr(serialize, derive(Serialize, Deserialize))]
 pub struct RK45<N: ComplexField> {
@@ -271,35 +330,11 @@ impl<N: ComplexField> RK45<N> {
         info.error_coefficients = Self::error_coefficients();
         RK45 { info }
     }
+}
 
-    pub fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_tolerance(tol)?;
-        Ok(self)
-    }
-
-    pub fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_max(max)?;
-        Ok(self)
-    }
-
-    pub fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_min(min)?;
-        Ok(self)
-    }
-
-    pub fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_start(t_initial)?;
-        Ok(self)
-    }
-
-    pub fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_end(t_final)?;
-        Ok(self)
-    }
-
-    pub fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.info = self.info.with_initial_conditions(start)?;
-        Ok(self)
+impl<N: ComplexField> Default for RK45<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -367,10 +402,44 @@ impl<N: ComplexField> RungeKuttaSolver<N> for RK45<N> {
     }
 
     fn solve_ivp<T: Clone>(
-        &mut self,
+        self,
         f: super::DerivativeFunc<N, N::RealField, T>,
         params: &mut T,
     ) -> super::Path<N, N::RealField> {
         self.info.solve_ivp(f, params)
+    }
+
+    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_tolerance(tol)?;
+        Ok(self)
+    }
+
+    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_max(max)?;
+        Ok(self)
+    }
+
+    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_min(min)?;
+        Ok(self)
+    }
+
+    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_start(t_initial)?;
+        Ok(self)
+    }
+
+    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_end(t_final)?;
+        Ok(self)
+    }
+
+    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
+        self.info = self.info.with_initial_conditions(start)?;
+        Ok(self)
+    }
+
+    fn build(self) -> Self {
+        self
     }
 }

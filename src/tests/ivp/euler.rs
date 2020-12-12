@@ -22,7 +22,7 @@ fn euler_test_exp() {
     let t_final = 1.0;
     let dt = 0.0005;
 
-    let mut euler = Euler::new()
+    let euler = Euler::new()
         .with_dt_max(dt)
         .unwrap()
         .with_start(t_initial)
@@ -52,7 +52,7 @@ fn euler_test_quadratic() {
     let t_final = 1.0;
     let dt = 0.0001;
 
-    let mut euler = Euler::new()
+    let euler = Euler::new()
         .with_dt_max(dt)
         .unwrap()
         .with_start(t_initial)

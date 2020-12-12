@@ -25,7 +25,7 @@ fn rkf_test_exp() -> Result<(), String> {
     let t_initial = 0.0;
     let t_final = 10.0;
 
-    let mut solver = RK45::new()
+    let solver = RK45::new()
         .with_dt_min(0.001)?
         .with_dt_max(0.01)?
         .with_start(t_initial)?
@@ -58,7 +58,7 @@ fn rkf_test_quadratic() -> Result<(), String> {
     let t_initial = 0.0;
     let t_final = 10.0;
 
-    let mut solver = RK45::new()
+    let solver = RK45::new()
         .with_dt_min(0.0001)?
         .with_dt_max(0.1)?
         .with_start(t_initial)?
@@ -92,7 +92,7 @@ fn rkf_test_sine() -> Result<(), String> {
     let t_initial = 0.0;
     let t_final = 10.0;
 
-    let mut solver = RK45::new()
+    let solver = RK45::new()
         .with_dt_min(0.001)?
         .with_dt_max(0.01)?
         .with_tolerance(0.0001)?
