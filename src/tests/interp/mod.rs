@@ -1,11 +1,11 @@
-use crate::interp::lagrange;
+use crate::interp::{hermite, lagrange};
 
 #[test]
 fn lagrange_interp() {
     let xs: Vec<_> = (0..10).map(|i| i as f64).collect();
     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
 
-    let poly = lagrange(&xs, &ys).unwrap();
+    let poly = lagrange(&xs, &ys, 1e-6).unwrap();
 
     for x in xs {
         println!("{} {}", poly.evaluate(x), x.cos());
@@ -22,3 +22,18 @@ fn lagrange_interp() {
         assert!(approx_eq!(f64, poly.evaluate(x), x.cos(), epsilon = 0.5));
     }
 }
+/*
+#[test]
+fn hermite_interp() {
+    let xs: Vec<_> = (0..10).map(|i| i as f64).collect();
+    let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
+    let derivs: Vec<_> = xs.iter().map(|x| -x.sin()).collect();
+
+    let poly = hermite(&xs, &ys, &derivs, 1e-6).unwrap();
+    println!("{:?}", poly);
+
+    for x in 0..=100 {
+        let x = x as f64 * 0.1;
+        assert!(approx_eq!(f64, poly.evaluate(x), x.cos(), epsilon = 0.5));
+    }
+}*/

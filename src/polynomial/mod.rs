@@ -145,7 +145,7 @@ impl<N: ComplexField> Polynomial<N> {
     /// Remove the coefficient of a power in the polynomial
     pub fn purge_coefficient(&mut self, power: usize) {
         match self.coefficients.len() {
-            len if len == power => {
+            len if len == power && len != 1 => {
                 self.coefficients.pop();
             }
             _ => {
