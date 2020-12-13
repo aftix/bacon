@@ -16,8 +16,7 @@ use num_traits::{FromPrimitive, Zero};
 /// for convience.
 ///
 /// # Examples
-/// See `struct RungeKutta` and `struct RungeKuttaFehlberg` for examples of implementing
-/// this trait.
+/// See `struct RK45` for an example of implementing this trait
 pub trait RungeKuttaSolver<N: ComplexField>: Sized {
     /// Returns a vec of coeffecients to multiply the time step by when getting
     /// intermediate results. Upper-left portion of Butch Tableaux

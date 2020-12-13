@@ -10,11 +10,25 @@ use nalgebra::DVector;
 use num_traits::{FromPrimitive, Zero};
 use std::collections::VecDeque;
 
+/// This trait allows a struct to be used in the Adams Predictor-Corrector solver
+///
+/// Things implementing AdamsSolver should have an AdamsInfo to handle the actual
+/// IVP solving.
+///
+/// # Examples
+/// See `struct Adams` for an example of implementing this trait
 pub trait AdamsSolver<N: ComplexField>: Sized {
+    /// The polynomial interpolation coefficients for the predictor. Should start
+    /// with the coefficient for n - 1
     fn predictor_coefficients() -> Vec<N::RealField>;
+    /// The polynomial interpolation coefficients for the corrector. Must be
+    /// the same length as predictor_coefficients. Should start with the
+    /// implicit coefficient.
     fn corrector_coefficients() -> Vec<N::RealField>;
+    /// Coefficient for multiplying error by.
     fn error_coefficient() -> N::RealField;
 
+    /// Use AdamsInfo to solve an initial value problem
     fn solve_ivp<T: Clone>(
         self,
         f: super::DerivativeFunc<N, N::RealField, T>,
@@ -37,6 +51,9 @@ pub trait AdamsSolver<N: ComplexField>: Sized {
     fn build(self) -> Self;
 }
 
+/// Provides an IVPSolver implementation for AdamsSolver, based on
+/// the predictor and correctorr coefficients. It is up to the AdamsSolver
+/// to set up AdamsInfo with the correct coefficients.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct AdamsInfo<N: ComplexField> {
@@ -378,6 +395,35 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
     }
 }
 
+/// 5th order Adams predictor-corrector method for solving an IVP.
+///
+/// Defines the predictor and corrector coefficients, as well as
+/// the error coefficient. Uses AdamsInfo for the actual solving.
+///
+/// # Examples
+/// ```
+/// use nalgebra::DVector;
+/// use bacon_sci::ivp::{IVPSolver, Adams, AdamsSolver};
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<DVector<f64>, String> {
+///     Ok(DVector::from_column_slice(state))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let adams = Adams::new()
+///         .with_dt_max(0.1)?
+///         .with_dt_min(0.00001)?
+///         .with_tolerance(0.00001)?
+///         .with_start(0.0)?
+///         .with_end(1.0)?
+///         .with_initial_conditions(&[1.0])?
+///         .build();
+///     let path = adams.solve_ivp(derivatives, &mut ())?;
+///     for (time, state) in &path {
+///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
+///     }
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Adams<N: ComplexField> {
