@@ -19,11 +19,11 @@ fn quadratic_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String
 #[test]
 fn pc_test_exp() -> Result<(), String> {
     let t_initial = 0.0;
-    let t_final = 1.0;
+    let t_final = 2.0;
 
     let solver = Adams::new()
         .with_dt_min(1e-5)?
-        .with_dt_max(0.001)?
+        .with_dt_max(0.1)?
         .with_tolerance(0.00001)?
         .with_start(t_initial)?
         .with_end(t_final)?
@@ -39,7 +39,7 @@ fn pc_test_exp() -> Result<(), String> {
                     f64,
                     step.1.column(0)[0],
                     step.0.exp(),
-                    epsilon = 0.001
+                    epsilon = 0.01
                 ));
             }
         }
@@ -52,7 +52,7 @@ fn pc_test_exp() -> Result<(), String> {
 #[test]
 fn pc_test_quadratic() -> Result<(), String> {
     let t_initial = 0.0;
-    let t_final = 1.0;
+    let t_final = 5.0;
 
     let solver = Adams::new()
         .with_dt_min(1e-5)?

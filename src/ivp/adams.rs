@@ -181,7 +181,7 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
         }
 
         let mut wp = self.state.as_ref().unwrap().clone();
-        for (ind, coef) in self.predictor_coefficients.iter().enumerate() {
+        for (ind, coef) in self.predictor_coefficients.iter().rev().enumerate() {
             wp += &self.memory[ind] * N::from_real(*coef) * N::from_real(self.dt.unwrap());
         }
         let implicit = f(
@@ -193,8 +193,10 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
         wc += &implicit
             * N::from_real(self.dt.unwrap())
             * N::from_real(self.corrector_coefficients[0]);
-        for (ind, coef) in self.corrector_coefficients.iter().skip(1).enumerate() {
-            wc += &self.memory[ind] * N::from_real(*coef) * N::from_real(self.dt.unwrap());
+        for (ind, coef) in self.corrector_coefficients.iter().enumerate().skip(1) {
+            wc += &self.memory[self.memory.len() - ind - 1]
+                * N::from_real(*coef)
+                * N::from_real(self.dt.unwrap());
         }
 
         let diff = &wc - &wp;
