@@ -14,7 +14,7 @@ use alga::general::ComplexField;
 /// fn example() {
 ///     let xs: Vec<_> = (0..10).map(|i| i as f64).collect();
 ///     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
-///     let poly = lagrange(&xs, &ys).unwrap();
+///     let poly = lagrange(&xs, &ys, 1e-6).unwrap();
 ///     for x in xs {
 ///         assert!((x.cos() - poly.evaluate(x)).abs() < 0.00001);
 ///     }
@@ -71,36 +71,35 @@ pub fn hermite<N: ComplexField>(
     }
 
     let mut zs = vec![N::zero(); 2 * xs.len()];
-    let mut qs = vec![Polynomial::new(); 4 * xs.len() * xs.len()];
+    let mut qs = vec![N::zero(); 4 * xs.len() * xs.len()];
 
     for i in 0..xs.len() {
         zs[2 * i] = xs[i];
         zs[2 * i + 1] = xs[i];
-        qs[2 * i] = polynomial![ys[i]];
-        qs[2 * i + 1] = polynomial![ys[i]];
-        qs[2 * i + 1 + (2 * xs.len())] = polynomial![derivs[i]];
+        qs[2 * i] = ys[i];
+        qs[2 * i + 1] = ys[i];
+        qs[2 * i + 1 + (2 * xs.len())] = derivs[i];
 
         if i != 0 {
-            qs[2 * i + (2 * xs.len())] =
-                (&qs[2 * i] - &qs[2 * i - 1]) * (N::one() / (zs[2 * i] - zs[2 * i - 1]));
+            qs[2 * i + (2 * xs.len())] = (qs[2 * i] - qs[2 * i - 1]) / (zs[2 * i] - zs[2 * i - 1]);
         }
     }
 
     for i in 2..2 * xs.len() {
         for j in 2..=i {
-            qs[i + j * (2 * xs.len())] = (&qs[i + (j - 1) * (2 * xs.len())]
-                - &qs[i - 1 + (j - 1) * (2 * xs.len())])
-                * (N::one() / (zs[i] - zs[i - j]));
+            qs[i + j * (2 * xs.len())] = (qs[i + (j - 1) * (2 * xs.len())]
+                - qs[i - 1 + (j - 1) * (2 * xs.len())])
+                / (zs[i] - zs[i - j]);
         }
     }
 
-    let mut hermite = qs[0].clone();
+    let mut hermite = polynomial![qs[0]];
     hermite.set_tolerance(tol)?;
     let mut tally = polynomial![N::one()];
     tally.set_tolerance(tol)?;
     for i in 1..2 * xs.len() {
         tally *= polynomial![N::one(), -xs[(i - 1) / 2]];
-        hermite += &qs[i + i * (2 * xs.len())] * &tally;
+        hermite += &tally * qs[i + i * (2 * xs.len())];
     }
 
     for i in 0..=hermite.order() {
