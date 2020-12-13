@@ -16,7 +16,7 @@ pub use rk::*;
 /// Status of an IVP Solver after a step
 pub enum IVPStatus<N: ComplexField> {
     Redo,
-    Ok((N::RealField, DVector<N>)),
+    Ok(Vec<(N::RealField, DVector<N>)>),
     Done,
 }
 
@@ -75,7 +75,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
             match step {
                 IVPStatus::Done => break 'out,
                 IVPStatus::Redo => {}
-                IVPStatus::Ok(state) => path.push(state),
+                IVPStatus::Ok(mut state) => path.append(&mut state),
             }
         }
 
@@ -154,10 +154,10 @@ impl<N: ComplexField> IVPSolver<N> for Euler<N> {
             .get_or_insert(DVector::from_column_slice(&[N::zero()])) +=
             deriv * N::from_real(self.dt.unwrap());
         *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
-        Ok(IVPStatus::Ok((
+        Ok(IVPStatus::Ok(vec![(
             self.time.unwrap(),
             self.state.clone().unwrap(),
-        )))
+        )]))
     }
 
     fn with_tolerance(self, _tol: N::RealField) -> Result<Self, String> {

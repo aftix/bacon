@@ -68,7 +68,7 @@ pub trait RungeKuttaSolver<N: ComplexField>: Sized {
 /// based entirely on the Butch Tableaux coefficients. It is up
 /// to the RungeKuttaSolver to set up RKInfo. See RK45 for an example.
 #[derive(Debug, Clone)]
-#[cfg_attr(serialize, derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct RKInfo<N: ComplexField> {
     dt: Option<N::RealField>,
     time: Option<N::RealField>,
@@ -177,10 +177,10 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
         }
 
         if output {
-            Ok(IVPStatus::Ok((
+            Ok(IVPStatus::Ok(vec![(
                 self.time.unwrap(),
                 self.state.as_ref().unwrap().clone(),
-            )))
+            )]))
         } else {
             Ok(IVPStatus::Redo)
         }
@@ -316,7 +316,7 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
 /// }
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(serialize, derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct RK45<N: ComplexField> {
     info: RKInfo<N>,
 }
