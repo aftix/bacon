@@ -8,3 +8,4 @@ mod interp;
 mod ivp;
 mod polynomial;
 mod roots;
+mod special;

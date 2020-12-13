@@ -19,6 +19,7 @@ pub mod roots;
 #[macro_use]
 pub mod polynomial;
 pub mod interp;
+pub mod special;
 
 #[cfg(test)]
 mod tests;
