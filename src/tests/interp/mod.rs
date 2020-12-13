@@ -25,7 +25,7 @@ fn lagrange_interp() {
 
 #[test]
 fn hermite_interp() {
-    let xs: Vec<_> = (0..2).map(|i| i as f64).collect();
+    let xs: Vec<_> = (0..4).map(|i| i as f64).collect();
     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
     let derivs: Vec<_> = xs.iter().map(|x| -x.sin()).collect();
 

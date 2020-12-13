@@ -835,19 +835,43 @@ impl<N: ComplexField> ops::Mul<N> for &Polynomial<N> {
     }
 }
 
+fn multiply<N: ComplexField>(lhs: &Polynomial<N>, rhs: &Polynomial<N>) -> Polynomial<N> {
+    // Do scalar multiplication if one side has no powers
+    if rhs.coefficients.len() == 1 {
+        return lhs * rhs.coefficients[0];
+    }
+    if lhs.coefficients.len() == 1 {
+        return rhs * lhs.coefficients[0];
+    }
+
+    // Special case linear term multiplication
+    if rhs.coefficients.len() == 2 {
+        let mut shifted = lhs * rhs.coefficients[1];
+        shifted.coefficients.insert(0, N::zero());
+        return shifted + lhs * rhs.coefficients[0];
+    }
+    if lhs.coefficients.len() == 2 {
+        let mut shifted = rhs * lhs.coefficients[1];
+        shifted.coefficients.insert(0, N::zero());
+        return shifted + rhs * lhs.coefficients[0];
+    }
+
+    let bound = lhs.coefficients.len().max(rhs.coefficients.len()) * 2;
+    let left_points = lhs.dft(bound);
+    let right_points = rhs.dft(bound);
+    let product_points: Vec<_> = left_points
+        .iter()
+        .zip(right_points.iter())
+        .map(|(l_p, r_p)| *l_p * r_p)
+        .collect();
+    Polynomial::<N>::idft(&product_points, lhs.tolerance)
+}
+
 impl<N: ComplexField> ops::Mul<Polynomial<N>> for Polynomial<N> {
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        Polynomial::<N>::idft(&product_points, self.tolerance)
+        multiply(&self, &rhs)
     }
 }
 
@@ -855,15 +879,7 @@ impl<N: ComplexField> ops::Mul<&Polynomial<N>> for Polynomial<N> {
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        Polynomial::<N>::idft(&product_points, self.tolerance)
+        multiply(&self, &rhs)
     }
 }
 
@@ -871,15 +887,7 @@ impl<N: ComplexField> ops::Mul<Polynomial<N>> for &Polynomial<N> {
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        Polynomial::<N>::idft(&product_points, self.tolerance)
+        multiply(&self, &rhs)
     }
 }
 
@@ -887,15 +895,7 @@ impl<N: ComplexField> ops::Mul<&Polynomial<N>> for &Polynomial<N> {
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        Polynomial::<N>::idft(&product_points, self.tolerance)
+        multiply(&self, &rhs)
     }
 }
 
@@ -909,29 +909,13 @@ impl<N: ComplexField> ops::MulAssign<N> for Polynomial<N> {
 
 impl<N: ComplexField> ops::MulAssign<Polynomial<N>> for Polynomial<N> {
     fn mul_assign(&mut self, rhs: Polynomial<N>) {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        self.coefficients = Polynomial::<N>::idft(&product_points, self.tolerance).coefficients;
+        self.coefficients = multiply(&self, &rhs).coefficients;
     }
 }
 
 impl<N: ComplexField> ops::MulAssign<&Polynomial<N>> for Polynomial<N> {
     fn mul_assign(&mut self, rhs: &Polynomial<N>) {
-        let bound = self.coefficients.len().max(rhs.coefficients.len()) * 2;
-        let self_points = self.dft(bound);
-        let rhs_points = rhs.dft(bound);
-        let product_points: Vec<_> = self_points
-            .iter()
-            .zip(rhs_points.iter())
-            .map(|(s_p, r_p)| *s_p * *r_p)
-            .collect();
-        self.coefficients = Polynomial::<N>::idft(&product_points, self.tolerance).coefficients;
+        self.coefficients = multiply(&self, &rhs).coefficients;
     }
 }
 
