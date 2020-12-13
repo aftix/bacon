@@ -4,6 +4,7 @@
  * See repository LICENSE for information.
  */
 
+mod interp;
 mod ivp;
 mod polynomial;
 mod roots;
