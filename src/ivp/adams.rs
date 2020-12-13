@@ -225,7 +225,10 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
                 || self.time.unwrap() > self.end.unwrap()
             {
                 let q = (self.tolerance.unwrap() / (N::RealField::from_f64(2.0).unwrap() * error))
-                    .powf(N::RealField::from_f64(0.25).unwrap());
+                    .powf(
+                        N::RealField::from_f64(1.0 / self.predictor_coefficients.len() as f64)
+                            .unwrap(),
+                    );
                 if q > N::RealField::from_f64(4.0).unwrap() {
                     self.dt = Some(self.dt.unwrap() * N::RealField::from_f64(4.0).unwrap());
                 } else {
@@ -255,8 +258,9 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
             return Ok(IVPStatus::Ok(output));
         }
 
-        let q = (self.tolerance.unwrap() / (N::RealField::from_f64(2.0).unwrap() * error))
-            .powf(N::RealField::from_f64(0.25).unwrap());
+        let q = (self.tolerance.unwrap() / (N::RealField::from_f64(2.0).unwrap() * error)).powf(
+            N::RealField::from_f64(1.0 / (self.predictor_coefficients.len() as f64)).unwrap(),
+        );
 
         if q < N::RealField::from_f64(0.1).unwrap() {
             self.dt = Some(self.dt.unwrap() * N::RealField::from_f64(0.1).unwrap());
