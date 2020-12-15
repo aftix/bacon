@@ -515,3 +515,9 @@ impl<N: ComplexField> AdamsSolver<N> for Adams<N> {
         self
     }
 }
+
+impl<N: ComplexField> From<Adams<N>> for AdamsInfo<N> {
+    fn from(adams: Adams<N>) -> AdamsInfo<N> {
+        adams.info
+    }
+}

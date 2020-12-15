@@ -974,3 +974,15 @@ impl<N: ComplexField> ops::Neg for &Polynomial<N> {
         }
     }
 }
+
+impl<N: ComplexField> From<N> for Polynomial<N> {
+    fn from(n: N) -> Polynomial<N> {
+        polynomial![n]
+    }
+}
+
+impl<N: RealField> From<Polynomial<N>> for Polynomial<Complex<N>> {
+    fn from(poly: Polynomial<N>) -> Polynomial<Complex<N>> {
+        poly.make_complex()
+    }
+}

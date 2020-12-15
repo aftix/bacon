@@ -442,3 +442,9 @@ impl<N: ComplexField> RungeKuttaSolver<N> for RK45<N> {
         self
     }
 }
+
+impl<N: ComplexField> From<RK45<N>> for RKInfo<N> {
+    fn from(rk: RK45<N>) -> RKInfo<N> {
+        rk.info
+    }
+}
