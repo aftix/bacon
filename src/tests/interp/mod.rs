@@ -1,5 +1,7 @@
 use crate::interp::{hermite, lagrange};
 
+mod spline;
+
 #[test]
 fn lagrange_interp() {
     let xs: Vec<_> = (0..10).map(|i| i as f64).collect();

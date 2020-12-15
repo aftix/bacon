@@ -1,6 +1,9 @@
 use super::polynomial::Polynomial;
 use alga::general::ComplexField;
 
+mod spline;
+pub use spline::*;
+
 /// Create a Lagrange interpolating polynomial.
 ///
 /// Create an nth degree polynomial matching the n points (xs[i], ys[i])
