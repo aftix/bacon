@@ -5,4 +5,5 @@ Scientific Computing in Rust
 * Adams-Bashforth family of IVP solvers
 * Root finding algorithms
 * Polynomials
+* Polynomial Interpolation
 * Scientific Constants
