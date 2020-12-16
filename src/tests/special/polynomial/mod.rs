@@ -1,4 +1,4 @@
-use crate::special::{hermite, legendre};
+use crate::special::{hermite, laguerre, legendre};
 
 #[test]
 fn legendre_test() {
@@ -145,6 +145,68 @@ fn hermite_test() {
         f64,
         h.get_coefficient(10),
         1024.0,
+        epsilon = 0.0001
+    ));
+}
+
+#[test]
+fn laguerre_test() {
+    let l = laguerre::<f64>(0);
+    assert_eq!(l.order(), 0);
+    assert!(approx_eq!(f64, l.get_coefficient(0), 1.0, epsilon = 0.0001));
+
+    let l = laguerre::<f64>(1);
+    assert_eq!(l.order(), 1);
+    assert!(approx_eq!(f64, l.get_coefficient(0), 1.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(1),
+        -1.0,
+        epsilon = 0.0001
+    ));
+
+    let l = laguerre::<f64>(6);
+    assert_eq!(l.order(), 6);
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(0),
+        720.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(1),
+        -4320.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(2),
+        5400.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(3),
+        -2400.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(4),
+        450.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(5),
+        -36.0 / 720.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        l.get_coefficient(6),
+        1.0 / 720.0,
         epsilon = 0.0001
     ));
 }

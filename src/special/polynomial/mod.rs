@@ -1,5 +1,6 @@
 use crate::polynomial::Polynomial;
 use alga::general::ComplexField;
+use std::iter::FromIterator;
 
 /// Get the nth legendre polynomial.
 ///
@@ -78,4 +79,52 @@ pub fn hermite<N: ComplexField>(n: u32) -> Polynomial<N> {
     }
 
     h_1
+}
+
+fn factorial(k: u32) -> u32 {
+    let mut acc = 1;
+    for i in 2..=k {
+        acc *= i;
+    }
+    acc
+}
+
+fn choose(n: u32, k: u32) -> u32 {
+    let mut acc = 1;
+    for i in n - k + 1..=n {
+        acc *= i;
+    }
+    for i in 2..=k {
+        acc /= i;
+    }
+    acc
+}
+
+/// Get the nth (positive) laguerre polynomial.
+///
+/// Gets the nth (positive) laguerre polynomial over a specified field. This is
+/// done using the direct formula and is properly normalized.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::special::laguerre;
+/// fn example() {
+///     let p_3 = laguerre::<f64>(3);
+///     assert_eq!(p_3.order(), 3);
+///     assert!((p_3.get_coefficient(0) - 1.0).abs() < 0.00001);
+///     assert!((p_3.get_coefficient(1) + 3.0).abs() < 0.00001);
+///     assert!((p_3.get_coefficient(2) - 9.0/6.0).abs() < 0.00001);
+///     assert!((p_3.get_coefficient(3) + 1.0/6.0).abs() < 0.00001);
+/// }
+///
+pub fn laguerre<N: ComplexField>(n: u32) -> Polynomial<N> {
+    let mut coefficients = Vec::with_capacity(n as usize + 1);
+    for k in 0..=n {
+        coefficients.push(
+            N::from_u32(choose(n, k)).unwrap() / N::from_u32(factorial(k)).unwrap()
+                * if k % 2 == 0 { N::one() } else { -N::one() },
+        );
+    }
+
+    Polynomial::from_iter(coefficients.iter().copied())
 }
