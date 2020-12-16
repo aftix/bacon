@@ -1,4 +1,4 @@
-use crate::special::{hermite, laguerre, legendre};
+use crate::special::{chebyshev, chebyshev_second, hermite, laguerre, legendre};
 
 #[test]
 fn legendre_test() {
@@ -207,6 +207,118 @@ fn laguerre_test() {
         f64,
         l.get_coefficient(6),
         1.0 / 720.0,
+        epsilon = 0.0001
+    ));
+}
+
+#[test]
+fn chebyshev_test() {
+    let t = chebyshev::<f64>(0);
+    assert_eq!(t.order(), 0);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 1.0, epsilon = 0.0001),);
+
+    let t = chebyshev::<f64>(1);
+    assert_eq!(t.order(), 1);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001),);
+    assert!(approx_eq!(f64, t.get_coefficient(1), 1.0, epsilon = 0.0001),);
+
+    let t = chebyshev::<f64>(11);
+    assert_eq!(t.order(), 11);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(1),
+        -11.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(2), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(3),
+        220.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(4), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(5),
+        -1232.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(6), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(7),
+        2816.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(8), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(9),
+        -2816.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(10),
+        0.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(11),
+        1024.0,
+        epsilon = 0.0001
+    ));
+}
+
+#[test]
+fn chebyshev_second_test() {
+    let t = chebyshev_second::<f64>(0);
+    assert_eq!(t.order(), 0);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 1.0, epsilon = 0.0001),);
+
+    let t = chebyshev_second::<f64>(1);
+    assert_eq!(t.order(), 1);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001),);
+    assert!(approx_eq!(f64, t.get_coefficient(1), 2.0, epsilon = 0.0001),);
+
+    let t = chebyshev_second::<f64>(9);
+    assert_eq!(t.order(), 9);
+    assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(1),
+        10.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(2), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(3),
+        -160.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(4), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(5),
+        672.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(6), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(7),
+        -1024.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, t.get_coefficient(8), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        t.get_coefficient(9),
+        512.0,
         epsilon = 0.0001
     ));
 }

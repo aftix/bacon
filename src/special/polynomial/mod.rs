@@ -128,3 +128,77 @@ pub fn laguerre<N: ComplexField>(n: u32) -> Polynomial<N> {
 
     Polynomial::from_iter(coefficients.iter().copied())
 }
+
+/// Get the nth chebyshev polynomial.
+///
+/// Gets the nth chebyshev polynomial over a specified field. This is
+/// done using the recursive formula and is properly normalized.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::special::chebyshev;
+/// fn example() {
+///     let t_3 = chebyshev::<f64>(3);
+///     assert_eq!(t_3.order(), 3);
+///     assert!(t_3.get_coefficient(0).abs() < 0.00001);
+///     assert!((t_3.get_coefficient(1) + 3.0).abs() < 0.00001);
+///     assert!(t_3.get_coefficient(2).abs() < 0.00001);
+///     assert!((t_3.get_coefficient(3) - 4.0).abs() < 0.00001);
+/// }
+///
+pub fn chebyshev<N: ComplexField>(n: u32) -> Polynomial<N> {
+    if n == 0 {
+        return polynomial![N::one()];
+    }
+    if n == 1 {
+        return polynomial![N::one(), N::zero()];
+    }
+
+    let mut t_0 = polynomial![N::one()];
+    let mut t_1 = polynomial![N::one(), N::zero()];
+    let double = polynomial![N::from_i32(2).unwrap(), N::zero()];
+
+    for _ in 1..n {
+        let next = &double * &t_1 - &t_0;
+        t_0 = t_1;
+        t_1 = next;
+    }
+    t_1
+}
+
+/// Get the nth chebyshev polynomial of the second kind.
+///
+/// Gets the nth chebyshev polynomial of the second kind over a specified field. This is
+/// done using the recursive formula and is properly normalized.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::special::chebyshev_second;
+/// fn example() {
+///     let u_3 = chebyshev_second::<f64>(3);
+///     assert_eq!(u_3.order(), 3);
+///     assert!(u_3.get_coefficient(0).abs() < 0.00001);
+///     assert!((u_3.get_coefficient(1) + 4.0).abs() < 0.00001);
+///     assert!(u_3.get_coefficient(2).abs() < 0.00001);
+///     assert!((u_3.get_coefficient(3) - 8.0).abs() < 0.00001);
+/// }
+///
+pub fn chebyshev_second<N: ComplexField>(n: u32) -> Polynomial<N> {
+    if n == 0 {
+        return polynomial![N::one()];
+    }
+    if n == 1 {
+        return polynomial![N::from_i32(2).unwrap(), N::zero()];
+    }
+
+    let mut t_0 = polynomial![N::one()];
+    let mut t_1 = polynomial![N::from_i32(2).unwrap(), N::zero()];
+    let double = t_1.clone();
+
+    for _ in 1..n {
+        let next = &double * &t_1 - &t_0;
+        t_0 = t_1;
+        t_1 = next;
+    }
+    t_1
+}
