@@ -7,3 +7,4 @@ Scientific Computing in Rust
 * Polynomials
 * Polynomial Interpolation
 * Scientific Constants
+* Special functions/polynomials
