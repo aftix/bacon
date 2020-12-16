@@ -17,6 +17,7 @@ use alga::general::ComplexField;
 ///     assert!(p_3.get_coefficient(2).abs() < 0.00001);
 ///     assert!((p_3.get_coefficient(3) - 2.5).abs() < 0.00001);
 /// }
+///
 pub fn legendre<N: ComplexField>(n: u32) -> Polynomial<N> {
     if n == 0 {
         return polynomial![N::one()];
@@ -38,4 +39,43 @@ pub fn legendre<N: ComplexField>(n: u32) -> Polynomial<N> {
     }
 
     p_1
+}
+
+/// Get the nth hermite polynomial.
+///
+/// Gets the nth physicist's hermite polynomial over a specified field. This is
+/// done using the recurrance relation so the normalization is standard for the
+/// physicist's hermite polynomial.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::special::hermite;
+/// fn example() {
+///     let h_3 = hermite::<f64>(3);
+///     assert_eq!(h_3.order(), 3);
+///     assert!(h_3.get_coefficient(0).abs() < 0.0001);
+///     assert!((h_3.get_coefficient(1) - 12.0).abs() < 0.0001);
+///     assert!(h_3.get_coefficient(2).abs() < 0.0001);
+///     assert!((h_3.get_coefficient(3) - 8.0).abs() < 0.0001);
+/// }
+/// ```
+pub fn hermite<N: ComplexField>(n: u32) -> Polynomial<N> {
+    if n == 0 {
+        return polynomial![N::one()];
+    }
+    if n == 1 {
+        return polynomial![N::from_f64(2.0).unwrap(), N::zero()];
+    }
+
+    let mut h_0 = polynomial![N::one()];
+    let mut h_1 = polynomial![N::from_f64(2.0).unwrap(), N::zero()];
+    let x_2 = h_1.clone();
+
+    for i in 1..n {
+        let next = &x_2 * &h_1 - (&h_0 * N::from_f64(2.0 * i as f64).unwrap());
+        h_0 = h_1;
+        h_1 = next;
+    }
+
+    h_1
 }

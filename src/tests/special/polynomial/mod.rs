@@ -1,4 +1,4 @@
-use crate::special::legendre;
+use crate::special::{hermite, legendre};
 
 #[test]
 fn legendre_test() {
@@ -63,6 +63,88 @@ fn legendre_test() {
         f64,
         p.get_coefficient(10),
         46189.0 / 256.0,
+        epsilon = 0.0001
+    ));
+}
+
+#[test]
+fn hermite_test() {
+    let h = hermite::<f64>(0);
+    assert_eq!(h.order(), 0);
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(0),
+        1.0,
+        epsilon = 0.0000001
+    ));
+
+    let h = hermite::<f64>(1);
+    assert_eq!(h.order(), 1);
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(0),
+        0.0,
+        epsilon = 0.000001
+    ));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(1),
+        2.0,
+        epsilon = 0.000001
+    ));
+
+    let h = hermite::<f64>(2);
+    assert_eq!(h.order(), 2);
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(0),
+        -2.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(1), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(f64, h.get_coefficient(2), 4.0, epsilon = 0.0001));
+
+    let h = hermite::<f64>(10);
+    assert_eq!(h.order(), 10);
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(0),
+        -30240.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(1), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(2),
+        302400.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(3), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(4),
+        -403200.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(5), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(6),
+        161280.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(7), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(8),
+        -23040.0,
+        epsilon = 0.0001
+    ));
+    assert!(approx_eq!(f64, h.get_coefficient(9), 0.0, epsilon = 0.0001));
+    assert!(approx_eq!(
+        f64,
+        h.get_coefficient(10),
+        1024.0,
         epsilon = 0.0001
     ));
 }
