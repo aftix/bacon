@@ -18,6 +18,8 @@ pub mod ivp;
 pub mod roots;
 #[macro_use]
 pub mod polynomial;
+pub mod differentiate;
+pub mod integrate;
 pub mod interp;
 pub mod special;
 
