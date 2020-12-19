@@ -5,6 +5,7 @@
  */
 
 mod differentiate;
+mod integrate;
 mod interp;
 mod ivp;
 mod polynomial;

@@ -447,9 +447,7 @@ impl<N: ComplexField> Polynomial<N> {
         } else {
             working
                 .iter()
-                .map(|c| {
-                    N::from_real(c.re) + N::from_f64(-1.0).unwrap().sqrt() * N::from_real(c.im)
-                })
+                .map(|c| N::from_real(c.re) + (-N::one()).sqrt() * N::from_real(c.im))
                 .collect::<Vec<_>>()
         };
 
