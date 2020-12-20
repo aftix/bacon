@@ -1,0 +1,17 @@
+Guassian-Legendre integration
+Adaptive quadrature
+Bessel functions
+spherical bessel functions
+zeros of legendre polynomials
+Backward differentiation formulas
+general purpose solve_ivp
+boundary value problems
+more special functions (scipy)
+Double integrals
+triple integrals
+Linear algebra algorithms?
+Euler-chromer method
+PDEs
+method of false position
+better README
+blogpost
