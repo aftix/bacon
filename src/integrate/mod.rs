@@ -11,7 +11,7 @@ use num_traits::FromPrimitive;
 ///
 /// Given a function and end points, numerically integrate
 /// using Romberg integration. Uses `n` steps.
-pub fn integrate<N: ComplexField>(
+pub fn integrate_fixed<N: ComplexField>(
     left: N::RealField,
     right: N::RealField,
     f: fn(N::RealField) -> N,

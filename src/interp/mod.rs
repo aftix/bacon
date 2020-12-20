@@ -102,14 +102,12 @@ pub fn hermite<N: ComplexField>(
         }
     }
 
-    let mut hermite = polynomial![qs[0]];
-    hermite.set_tolerance(tol)?;
-    let mut tally = polynomial![N::one()];
-    tally.set_tolerance(tol)?;
-    for i in 1..2 * xs.len() {
-        tally *= polynomial![N::one(), -xs[(i - 1) / 2]];
-        hermite += &tally * qs[i + i * (2 * xs.len())];
+    let mut hermite = polynomial![N::zero()];
+    for i in (1..2 * xs.len()).rev() {
+        hermite += qs[i + i * (2 * xs.len())];
+        hermite *= polynomial![N::one(), -xs[(i - 1) / 2]]
     }
+    hermite += qs[0];
 
     for i in 0..=hermite.order() {
         if hermite.get_coefficient(i).abs() < tol {

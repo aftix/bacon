@@ -33,17 +33,15 @@ fn lagrange_interp() {
 
 #[test]
 fn hermite_interp() {
-    let xs: Vec<_> = (0..4).map(|i| i as f64).collect();
+    let xs: Vec<_> = (0..5).map(|i| i as f64).collect();
     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
     let derivs: Vec<_> = xs.iter().map(|x| -x.sin()).collect();
 
     let poly = hermite(&xs, &ys, &derivs, 1e-6).unwrap();
-    println!("{:?}", poly);
 
     for x in xs {
         let (p, deriv) = poly.evaluate_derivative(x);
-        println!("({} {}) ({} {})", p, deriv, x.cos(), -x.sin());
-        assert!(approx_eq!(f64, p, x.cos(), epsilon = 1.0));
-        assert!(approx_eq!(f64, deriv, -x.sin(), epsilon = 1.0));
+        assert!(approx_eq!(f64, p, x.cos(), epsilon = 0.0000001));
+        assert!(approx_eq!(f64, deriv, -x.sin(), epsilon = 0.0000001));
     }
 }
