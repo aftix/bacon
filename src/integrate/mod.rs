@@ -7,6 +7,11 @@
 use alga::general::{ComplexField, RealField};
 use num_traits::FromPrimitive;
 
+/// Numerically integrate a function over an interval within a tolerance.
+///
+/// Given a function and end points, numerically integrate using adaptive
+/// simpson's rule until the error is within tolerance or the maximum
+/// iterations are exceeded.
 pub fn integrate<N: ComplexField>(
     left: N::RealField,
     right: N::RealField,
