@@ -108,25 +108,21 @@ pub fn muller_polynomial<N: ComplexField>(
     let mut delta_2 = (poly_2_evaluated - poly_1_evaluated) / h_2;
     let mut delta = (delta_2 - delta_1) / (h_2 + h_1);
 
+    let negtwo = N::RealField::from_i32(-2).unwrap();
+    let four = N::RealField::from_i32(4).unwrap();
+
     while n < n_max {
         let b_coefficient = delta_2 + h_2 * delta;
         let determinate = (b_coefficient.powi(2)
-            - Complex::<N::RealField>::new(
-                N::RealField::from_f64(4.0).unwrap(),
-                N::RealField::zero(),
-            ) * poly_2_evaluated
-                * delta)
+            - Complex::<N::RealField>::new(four, N::RealField::zero()) * poly_2_evaluated * delta)
             .sqrt();
         let error = if (b_coefficient - determinate).abs() < (b_coefficient + determinate).abs() {
             b_coefficient + determinate
         } else {
             b_coefficient - determinate
         };
-        let step = Complex::<N::RealField>::new(
-            N::RealField::from_f64(-2.0).unwrap(),
-            N::RealField::zero(),
-        ) * poly_2_evaluated
-            / error;
+        let step =
+            Complex::<N::RealField>::new(negtwo, N::RealField::zero()) * poly_2_evaluated / error;
         let p = poly_2 + step;
 
         if step.abs() <= tol {

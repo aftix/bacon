@@ -58,7 +58,9 @@ pub fn bisection<N: RealField>(
         return Err("Bisection: requirement: Signs must be different".to_owned());
     }
 
-    let mut half_interval = (left - right) * N::from_f64(0.5).unwrap();
+    let half = N::from_f64(0.5).unwrap();
+
+    let mut half_interval = (left - right) * half;
     let mut middle = left + half_interval;
 
     if middle.abs() <= tol {
@@ -74,7 +76,7 @@ pub fn bisection<N: RealField>(
             right = middle;
         }
 
-        half_interval = (right - left) * N::from_f64(0.5).unwrap();
+        half_interval = (right - left) * half;
 
         let middle_new = left + half_interval;
 

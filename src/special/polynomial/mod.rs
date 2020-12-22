@@ -59,6 +59,8 @@ pub fn legendre_zeros<N: ComplexField>(
     let mut p_1 = polynomial![N::one(), N::zero()];
     let mut zeros = vec![N::zero()];
 
+    let half = N::from_f64(0.5).unwrap();
+
     for i in 1..n {
         let mut p_next = polynomial![N::from_u32(2 * i + 1).unwrap(), N::zero()] * &p_1;
         p_next -= &p_0 * N::from_u32(i).unwrap();
@@ -67,9 +69,9 @@ pub fn legendre_zeros<N: ComplexField>(
         let mut guesses = Vec::with_capacity(i as usize + 1);
         guesses.push(N::from_f64(0.5).unwrap() * (zeros[0] - N::one()));
         for j in 1..zeros.len() {
-            guesses.push(N::from_f64(0.5).unwrap() * (zeros[j] + zeros[j - 1]));
+            guesses.push(half * (zeros[j] + zeros[j - 1]));
         }
-        guesses.push(N::from_f64(0.5).unwrap() * (N::one() + zeros[zeros.len() - 1]));
+        guesses.push(half * (N::one() + zeros[zeros.len() - 1]));
 
         p_0 = p_1;
         p_1 = p_next;

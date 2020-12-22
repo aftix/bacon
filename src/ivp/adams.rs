@@ -197,6 +197,10 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
             self.state = Some(self.states.back().unwrap().1.clone());
         }
 
+        let tenth_real = N::RealField::from_f64(0.1).unwrap();
+        let two_real = N::RealField::from_i32(2).unwrap();
+        let four_real = N::RealField::from_i32(4).unwrap();
+
         let mut wp = self.state.as_ref().unwrap().clone();
         for (ind, coef) in self.predictor_coefficients.iter().rev().enumerate() {
             wp += &self.memory[ind] * N::from_real(*coef) * N::from_real(self.dt.unwrap());
@@ -240,16 +244,14 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
                 return Ok(IVPStatus::Ok(output));
             }
 
-            if error < N::RealField::from_f64(0.1).unwrap() * self.tolerance.unwrap()
+            if error < tenth_real * self.tolerance.unwrap()
                 || self.time.unwrap() > self.end.unwrap()
             {
-                let q = (self.tolerance.unwrap() / (N::RealField::from_f64(2.0).unwrap() * error))
-                    .powf(
-                        N::RealField::from_f64(1.0 / self.predictor_coefficients.len() as f64)
-                            .unwrap(),
-                    );
-                if q > N::RealField::from_f64(4.0).unwrap() {
-                    self.dt = Some(self.dt.unwrap() * N::RealField::from_f64(4.0).unwrap());
+                let q = (self.tolerance.unwrap() / (two_real * error)).powf(
+                    N::RealField::from_f64(1.0 / self.predictor_coefficients.len() as f64).unwrap(),
+                );
+                if q > four_real {
+                    self.dt = Some(self.dt.unwrap() * four_real);
                 } else {
                     self.dt = Some(self.dt.unwrap() * q);
                 }
@@ -281,8 +283,8 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
             N::RealField::from_f64(1.0 / (self.predictor_coefficients.len() as f64)).unwrap(),
         );
 
-        if q < N::RealField::from_f64(0.1).unwrap() {
-            self.dt = Some(self.dt.unwrap() * N::RealField::from_f64(0.1).unwrap());
+        if q < tenth_real {
+            self.dt = Some(self.dt.unwrap() * tenth_real);
         } else {
             self.dt = Some(self.dt.unwrap() * q);
         }
