@@ -1,4 +1,4 @@
-use crate::special::{chebyshev, chebyshev_second, hermite, laguerre, legendre};
+use crate::special::{chebyshev, chebyshev_second, hermite, laguerre, legendre, legendre_zeros};
 
 #[test]
 fn legendre_test() {
@@ -65,6 +65,23 @@ fn legendre_test() {
         46189.0 / 256.0,
         epsilon = 0.0001
     ));
+}
+
+#[test]
+fn legendre_zero_test() {
+    for i in 1..20 {
+        let poly = legendre::<f64>(i);
+        let zeros = legendre_zeros::<f64>(i, 1e-8, 100).unwrap();
+        for (ind, zero) in zeros.iter().enumerate() {
+            assert!(approx_eq!(f64, poly.evaluate(*zero), 0.0, epsilon = 0.0001));
+            for (j, other) in zeros.iter().enumerate() {
+                if j == ind {
+                    continue;
+                }
+                assert!(!approx_eq!(f64, *zero, *other, epsilon = 0.0001));
+            }
+        }
+    }
 }
 
 #[test]

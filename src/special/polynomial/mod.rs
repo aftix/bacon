@@ -42,6 +42,47 @@ pub fn legendre<N: ComplexField>(n: u32) -> Polynomial<N> {
     p_1
 }
 
+/// Get the zeros of the nth legendre polynomial.
+pub fn legendre_zeros<N: ComplexField>(
+    n: u32,
+    tol: N::RealField,
+    n_max: usize,
+) -> Result<Vec<N>, String> {
+    if n == 0 {
+        return Ok(vec![]);
+    }
+    if n == 1 {
+        return Ok(vec![N::zero()]);
+    }
+
+    let mut p_0 = polynomial![N::one()];
+    let mut p_1 = polynomial![N::one(), N::zero()];
+    let mut zeros = vec![N::zero()];
+
+    for i in 1..n {
+        let mut p_next = polynomial![N::from_u32(2 * i + 1).unwrap(), N::zero()] * &p_1;
+        p_next -= &p_0 * N::from_u32(i).unwrap();
+        p_next /= N::from_u32(i + 1).unwrap();
+
+        let mut guesses = Vec::with_capacity(i as usize + 1);
+        guesses.push(N::from_f64(0.5).unwrap() * (zeros[0] - N::one()));
+        for j in 1..zeros.len() {
+            guesses.push(N::from_f64(0.5).unwrap() * (zeros[j] + zeros[j - 1]));
+        }
+        guesses.push(N::from_f64(0.5).unwrap() * (N::one() + zeros[zeros.len() - 1]));
+
+        p_0 = p_1;
+        p_1 = p_next;
+        zeros = Vec::from_iter(
+            p_1.roots(&guesses, tol, n_max)?
+                .iter()
+                .map(|c| N::from_real(c.re)),
+        );
+    }
+
+    Ok(zeros)
+}
+
 /// Get the nth hermite polynomial.
 ///
 /// Gets the nth physicist's hermite polynomial over a specified field. This is

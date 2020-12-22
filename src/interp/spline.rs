@@ -94,12 +94,16 @@ pub fn spline_free<N: ComplexField>(
         return Err("spline_free: xs must be sorted".to_owned());
     }
 
+    let third = N::from_f64(1.0 / 3.0).unwrap();
+    let two = N::from_i32(2).unwrap();
+    let three = N::from_i32(3).unwrap();
+
     let mut alphas = Vec::with_capacity(xs.len() - 1);
     alphas.push(N::zero());
     for i in 1..xs.len() - 1 {
         alphas.push(
-            (N::from_f64(3.0).unwrap() / N::from_real(hs[i])) * (ys[i + 1] - ys[i])
-                - (N::from_f64(3.0).unwrap() / N::from_real(hs[i - 1])) * (ys[i] - ys[i - 1]),
+            (three / N::from_real(hs[i])) * (ys[i + 1] - ys[i])
+                - (three / N::from_real(hs[i - 1])) * (ys[i] - ys[i - 1]),
         );
     }
 
@@ -112,10 +116,7 @@ pub fn spline_free<N: ComplexField>(
     z.push(N::zero());
 
     for i in 1..xs.len() - 1 {
-        l.push(
-            N::from_f64(2.0).unwrap() * N::from_real(xs[i + 1] - xs[i - 1])
-                - N::from_real(hs[i - 1]) * mu[i - 1],
-        );
+        l.push(two * N::from_real(xs[i + 1] - xs[i - 1]) - N::from_real(hs[i - 1]) * mu[i - 1]);
         mu.push(N::from_real(hs[i]) / l[i]);
         z.push((alphas[i] - N::from_real(hs[i - 1]) * z[i - 1]) / l[i]);
     }
@@ -129,11 +130,9 @@ pub fn spline_free<N: ComplexField>(
     for i in (0..xs.len() - 1).rev() {
         c_coefficient[i] = z[i] - mu[i] * c_coefficient[i + 1];
         b_coefficient[i] = (ys[i + 1] - ys[i]) / N::from_real(hs[i])
-            - N::from_real(hs[i])
-                * (c_coefficient[i + 1] + N::from_f64(2.0).unwrap() * c_coefficient[i])
-                * N::from_f64(1.0 / 3.0).unwrap();
-        d_coefficient[i] = (c_coefficient[i + 1] - c_coefficient[i])
-            / (N::from_f64(3.0).unwrap() * N::from_real(hs[i]));
+            - N::from_real(hs[i]) * (c_coefficient[i + 1] + two * c_coefficient[i]) * third;
+        d_coefficient[i] =
+            (c_coefficient[i + 1] - c_coefficient[i]) / (three * N::from_real(hs[i]));
     }
 
     let mut polynomials = Vec::with_capacity(xs.len() - 1);
@@ -212,13 +211,18 @@ pub fn spline_clamped<N: ComplexField>(
         return Err("spline_clamped: xs must be sorted".to_owned());
     }
 
+    let third = N::from_f64(1.0 / 3.0).unwrap();
+    let half = N::from_f64(0.5).unwrap();
+    let two = N::from_i32(2).unwrap();
+    let three = N::from_i32(3).unwrap();
+
     let mut alphas = vec![N::zero(); xs.len()];
-    alphas[0] = N::from_f64(3.0).unwrap() * ((ys[1] - ys[0]) / N::from_real(hs[0]) - f_0);
-    alphas[xs.len() - 1] = N::from_f64(3.0).unwrap()
-        * (f_n - (ys[xs.len() - 1] - ys[xs.len() - 2]) / N::from_real(hs[xs.len() - 2]));
+    alphas[0] = three * ((ys[1] - ys[0]) / N::from_real(hs[0]) - f_0);
+    alphas[xs.len() - 1] =
+        three * (f_n - (ys[xs.len() - 1] - ys[xs.len() - 2]) / N::from_real(hs[xs.len() - 2]));
 
     for i in 1..xs.len() - 1 {
-        alphas[i] = N::from_f64(3.0).unwrap()
+        alphas[i] = three
             * ((ys[i + 1] - ys[i]) / N::from_real(hs[i])
                 - (ys[i] - ys[i - 1]) / N::from_real(hs[i - 1]));
     }
@@ -227,20 +231,17 @@ pub fn spline_clamped<N: ComplexField>(
     let mut mu = Vec::with_capacity(xs.len() - 1);
     let mut z = Vec::with_capacity(xs.len() - 1);
 
-    l.push(N::from_f64(2.0).unwrap() * N::from_real(hs[0]));
-    mu.push(N::from_f64(0.5).unwrap());
+    l.push(two * N::from_real(hs[0]));
+    mu.push(half);
     z.push(alphas[0] / l[0]);
 
     for i in 1..xs.len() - 1 {
-        l.push(
-            N::from_f64(2.0).unwrap() * N::from_real(xs[i + 1] - xs[i - 1])
-                - N::from_real(hs[i - 1]) * mu[i - 1],
-        );
+        l.push(two * N::from_real(xs[i + 1] - xs[i - 1]) - N::from_real(hs[i - 1]) * mu[i - 1]);
         mu.push(N::from_real(hs[i]) / l[i]);
         z.push((alphas[i] - N::from_real(hs[i - 1]) * z[i - 1]) / l[i]);
     }
 
-    l.push(N::from_real(hs[xs.len() - 2]) * (N::from_f64(2.0).unwrap() - mu[xs.len() - 2]));
+    l.push(N::from_real(hs[xs.len() - 2]) * (two - mu[xs.len() - 2]));
     z.push(
         (alphas[xs.len() - 1] - N::from_real(hs[xs.len() - 2]) * z[xs.len() - 2]) / l[xs.len() - 1],
     );
@@ -254,11 +255,9 @@ pub fn spline_clamped<N: ComplexField>(
     for i in (0..xs.len() - 1).rev() {
         c_coefficient[i] = z[i] - mu[i] * c_coefficient[i + 1];
         b_coefficient[i] = (ys[i + 1] - ys[i]) / N::from_real(hs[i])
-            - N::from_real(hs[i])
-                * N::from_f64(1.0 / 3.0).unwrap()
-                * (c_coefficient[i + 1] + N::from_f64(2.0).unwrap() * c_coefficient[i]);
-        d_coefficient[i] = (c_coefficient[i + 1] - c_coefficient[i])
-            / (N::from_f64(3.0).unwrap() * N::from_real(hs[i]));
+            - N::from_real(hs[i]) * third * (c_coefficient[i + 1] + two * c_coefficient[i]);
+        d_coefficient[i] =
+            (c_coefficient[i + 1] - c_coefficient[i]) / (three * N::from_real(hs[i]));
     }
 
     let mut polynomials = Vec::with_capacity(xs.len() - 1);

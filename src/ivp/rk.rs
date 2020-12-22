@@ -116,6 +116,11 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
             return Ok(IVPStatus::Done);
         }
 
+        let tenth_real = N::RealField::from_f64(0.1).unwrap();
+        let quater_real = N::RealField::from_f64(0.25).unwrap();
+        let eighty_fourths_real = N::RealField::from_f64(0.84).unwrap();
+        let four_real = N::RealField::from_i32(4).unwrap();
+
         let mut set_dt = false;
         if self.time.unwrap() + self.dt.unwrap() >= self.end.unwrap() {
             set_dt = true;
@@ -157,12 +162,11 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
             }
         }
 
-        let delta = N::RealField::from_f64(0.84).unwrap()
-            * (self.tolerance.unwrap() / error).powf(N::RealField::from_f64(0.25).unwrap());
-        if delta <= N::RealField::from_f64(0.1).unwrap() {
-            *self.dt.get_or_insert(N::RealField::zero()) *= N::RealField::from_f64(0.1).unwrap();
-        } else if delta >= N::RealField::from_f64(4.0).unwrap() {
-            *self.dt.get_or_insert(N::RealField::zero()) *= N::RealField::from_f64(4.0).unwrap();
+        let delta = eighty_fourths_real * (self.tolerance.unwrap() / error).powf(quater_real);
+        if delta <= tenth_real {
+            *self.dt.get_or_insert(N::RealField::zero()) *= tenth_real;
+        } else if delta >= four_real {
+            *self.dt.get_or_insert(N::RealField::zero()) *= four_real;
         } else {
             *self.dt.get_or_insert(N::RealField::zero()) *= delta;
         }

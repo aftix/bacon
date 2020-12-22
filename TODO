@@ -1,7 +1,5 @@
-Guassian-Legendre integration
 Bessel functions
 spherical bessel functions
-zeros of legendre polynomials
 Backward differentiation formulas
 general purpose solve_ivp
 boundary value problems
