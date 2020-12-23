@@ -19,3 +19,5 @@ generalized laguerre polynomials
 Airy function
 Tanh-Sinh quadrature
 Aberth method
+Real roots
+lower-order methods (RK23, Adams3, BDF3)
