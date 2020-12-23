@@ -1,4 +1,6 @@
-use crate::special::{chebyshev, chebyshev_second, hermite, laguerre, legendre, legendre_zeros};
+use crate::special::{
+    chebyshev, chebyshev_second, hermite, hermite_zeros, laguerre, legendre, legendre_zeros,
+};
 
 #[test]
 fn legendre_test() {
@@ -164,6 +166,23 @@ fn hermite_test() {
         1024.0,
         epsilon = 0.0001
     ));
+}
+
+#[test]
+fn hermite_zero_test() {
+    for i in 1..10 {
+        let poly = hermite::<f64>(i);
+        let zeros = hermite_zeros::<f64>(i, 1e-10, 100).unwrap();
+        for (ind, zero) in zeros.iter().enumerate() {
+            assert!(approx_eq!(f64, poly.evaluate(*zero), 0.0, epsilon = 0.005));
+            for (j, other) in zeros.iter().enumerate() {
+                if j == ind {
+                    continue;
+                }
+                assert!(!approx_eq!(f64, *zero, *other, epsilon = 0.0001));
+            }
+        }
+    }
 }
 
 #[test]

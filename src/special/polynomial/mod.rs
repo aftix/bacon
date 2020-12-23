@@ -1,5 +1,6 @@
 use crate::polynomial::Polynomial;
 use alga::general::ComplexField;
+use num_traits::FromPrimitive;
 use std::iter::FromIterator;
 
 /// Get the nth legendre polynomial.
@@ -75,11 +76,13 @@ pub fn legendre_zeros<N: ComplexField>(
 
         p_0 = p_1;
         p_1 = p_next;
-        zeros = Vec::from_iter(
-            p_1.roots(&guesses, tol, n_max)?
-                .iter()
-                .map(|c| N::from_real(c.re)),
-        );
+        zeros = Vec::from_iter(p_1.roots(&guesses, tol, n_max)?.iter().map(|c| {
+            if c.re.abs() < tol {
+                N::zero()
+            } else {
+                N::from_real(c.re)
+            }
+        }));
     }
 
     Ok(zeros)
@@ -122,6 +125,42 @@ pub fn hermite<N: ComplexField>(n: u32) -> Polynomial<N> {
     }
 
     h_1
+}
+
+pub fn hermite_zeros<N: ComplexField>(
+    n: u32,
+    tol: N::RealField,
+    n_max: usize,
+) -> Result<Vec<N>, String> {
+    if n == 0 {
+        return Ok(vec![]);
+    }
+    if n == 1 {
+        return Ok(vec![N::zero()]);
+    }
+
+    let one_sixth = N::RealField::from_f64(1.0 / 6.0).unwrap();
+    let special = N::from_f64(1.8557381459995952).unwrap();
+
+    // Guesses are x_n = sqrt(2n) - i1/cbrt(6) * 1/(2n)^(1/6)
+    // where i1 is the first zero of a function related to the first Airy function
+    let mut guesses = Vec::with_capacity(n as usize);
+    for i in 1..=n {
+        let two_i = N::from_u32(2 * i).unwrap();
+        guesses.push(two_i.sqrt() - special * two_i.powf(-one_sixth));
+    }
+
+    let poly = hermite(n);
+
+    Ok(Vec::from_iter(
+        poly.roots(&guesses, tol, n_max)?.iter().map(|c| {
+            if c.re.abs() < tol {
+                N::zero()
+            } else {
+                N::from_real(c.re)
+            }
+        }),
+    ))
 }
 
 fn factorial(k: u32) -> u32 {
