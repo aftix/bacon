@@ -127,6 +127,7 @@ pub fn hermite<N: ComplexField>(n: u32) -> Polynomial<N> {
     h_1
 }
 
+/// Get the zeros of the nth Hermite polynomial
 pub fn hermite_zeros<N: ComplexField>(
     n: u32,
     tol: N::RealField,

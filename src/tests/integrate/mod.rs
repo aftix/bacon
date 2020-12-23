@@ -1,4 +1,4 @@
-use crate::integrate::{integrate, integrate_fixed, integrate_gaussian};
+use crate::integrate::{integrate, integrate_fixed, integrate_gaussian, integrate_hermite};
 use std::f64;
 
 fn exp(x: f64) -> f64 {
@@ -11,6 +11,18 @@ fn sin(x: f64) -> f64 {
 
 fn sinsin(x: f64) -> f64 {
     x.sin().sin()
+}
+
+fn one(_: f64) -> f64 {
+    1.0
+}
+
+fn x(x: f64) -> f64 {
+    x
+}
+
+fn xsquared(x: f64) -> f64 {
+    x.powi(2)
 }
 
 #[test]
@@ -56,4 +68,26 @@ fn test_integrate_gaussian() {
     ));
     let area = integrate_gaussian(0.0, f64::consts::PI, sinsin, 0.00001, 10).unwrap();
     assert!(approx_eq!(f64, area, 1.78649, epsilon = 0.0001));
+}
+
+#[test]
+fn test_integrate_hermite() {
+    let area = integrate_hermite(one, 0.00001, 10).unwrap();
+    assert!(approx_eq!(
+        f64,
+        area,
+        f64::consts::PI.sqrt(),
+        epsilon = 0.0001
+    ));
+    let area = integrate_hermite(x, 0.00001, 10).unwrap();
+    assert!(approx_eq!(f64, area, 0.0, epsilon = 0.0001));
+    let area = integrate_hermite(xsquared, 0.00001, 10).unwrap();
+    assert!(approx_eq!(
+        f64,
+        area,
+        f64::consts::PI.sqrt() / 2.0,
+        epsilon = 0.0001
+    ));
+    let area = integrate_hermite(sin, 0.00001, 10).unwrap();
+    assert!(approx_eq!(f64, area, 0.0, epsilon = 0.0001));
 }
