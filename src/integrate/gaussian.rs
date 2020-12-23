@@ -140,3 +140,82 @@ pub fn integrate_hermite<N: ComplexField>(
 
     Err("integrate_hermite: maximum iterations exceeded".to_owned())
 }
+
+/// Numerically integrate an integral of the form int_-1^1 f(x) / sqrt(1 - x^2) dx
+/// within a tolerance.
+///
+/// Given a function, numerically integrate using Chebyshev-Gaussian Quadrature
+/// of the first kind until two consecutive iterations are within tolerance
+/// or the maximum number of iterations is exceeded.
+pub fn integrate_chebyshev<N: ComplexField>(
+    f: fn(N::RealField) -> N,
+    tol: N::RealField,
+    n_max: usize,
+) -> Result<N, String> {
+    let mut prev_err = tol + N::RealField::one();
+    let mut prev_area = N::zero();
+
+    let mut i: u32 = 2;
+    while i < n_max as u32 {
+        let mut area = N::zero();
+        let denom = 1.0 / (2 * i) as f64;
+        let weight = N::from_f64(f64::consts::PI / i as f64).unwrap();
+        for j in 1..=i {
+            let x_i = (2 * j - 1) as f64 * f64::consts::PI * denom;
+            let x_i = x_i.cos();
+            area += f(N::RealField::from_f64(x_i).unwrap()) * weight;
+        }
+
+        let error = (area - prev_area).abs();
+        if error < tol && prev_err < tol {
+            return Ok(area);
+        }
+
+        prev_area = area;
+        prev_err = error;
+        i += 1;
+    }
+
+    Err("integrate_chebyshev: maximum iterations exceeded".to_owned())
+}
+
+/// Numerically integrate an integral of the form int_-1^1 f(x) sqrt(1 - x^2) dx
+/// within a tolerance.
+///
+/// Given a function, numerically integrate using Chebyshev-Gaussian Quadrature
+/// of the second kind until two consecutive iterations are within tolerance
+/// or the maximum number of iterations is exceeded.
+pub fn integrate_chebyshev_second<N: ComplexField>(
+    f: fn(N::RealField) -> N,
+    tol: N::RealField,
+    n_max: usize,
+) -> Result<N, String> {
+    let mut prev_err = tol + N::RealField::one();
+    let mut prev_area = N::zero();
+
+    let pi = N::from_f64(f64::consts::PI).unwrap();
+
+    let mut i: u32 = 2;
+    while i < n_max as u32 {
+        let mut area = N::zero();
+        let denom = N::from_f64(1.0 / (i + 1) as f64).unwrap();
+        let weight = pi * denom;
+        for j in 1..=i {
+            let j = N::from_u32(j).unwrap();
+            let x_i = (j * weight).cos();
+            let weight = weight * (j * weight).sin().powi(2);
+            area += f(x_i.real()) * weight;
+        }
+
+        let error = (area - prev_area).abs();
+        if error < tol && prev_err < tol {
+            return Ok(area);
+        }
+
+        prev_area = area;
+        prev_err = error;
+        i += 1;
+    }
+
+    Err("integrate_chebyshev: maximum iterations exceeded".to_owned())
+}
