@@ -1,6 +1,5 @@
 Bessel functions
 spherical bessel functions
-general purpose solve_ivp
 boundary value problems
 more special functions (scipy)
 Double integrals
