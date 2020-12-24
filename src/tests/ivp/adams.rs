@@ -34,7 +34,7 @@ fn pc_test_exp() -> Result<(), String> {
         .with_initial_conditions(&[1.0])?
         .build();
 
-    let path = solver.solve_ivp(exp_deriv, &mut ());
+    let path = solver.solve_ivp(&exp_deriv, &mut ());
 
     match path {
         Ok(path) => {
@@ -67,7 +67,7 @@ fn pc_test_quadratic() -> Result<(), String> {
         .with_initial_conditions(&[1.0])?
         .build();
 
-    let path = solver.solve_ivp(quadratic_deriv, &mut ());
+    let path = solver.solve_ivp(&quadratic_deriv, &mut ());
 
     match path {
         Ok(path) => {
@@ -100,7 +100,7 @@ fn pc_sine() -> Result<(), String> {
         .with_initial_conditions(&[0.0])?
         .build();
 
-    let path = solver.solve_ivp(sine_deriv, &mut ());
+    let path = solver.solve_ivp(&sine_deriv, &mut ());
 
     match path {
         Ok(path) => {

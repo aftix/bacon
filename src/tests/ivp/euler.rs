@@ -33,7 +33,7 @@ fn euler_test_exp() {
         .unwrap()
         .build();
 
-    let path = euler.solve_ivp(exp_deriv, &mut ()).unwrap();
+    let path = euler.solve_ivp(&exp_deriv, &mut ()).unwrap();
 
     for step in &path {
         assert!(approx_eq!(
@@ -63,7 +63,7 @@ fn euler_test_quadratic() {
         .unwrap()
         .build();
 
-    let path = euler.solve_ivp(quadratic_deriv, &mut ()).unwrap();
+    let path = euler.solve_ivp(&quadratic_deriv, &mut ()).unwrap();
 
     for step in &path {
         assert!(approx_eq!(

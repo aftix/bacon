@@ -61,7 +61,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
     /// Solve an initial value problem, consuming the solver
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         mut self,
-        f: F,
+        f: &F,
         params: &mut T,
     ) -> Path<N, N::RealField> {
         self.check_start()?;
@@ -102,7 +102,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
 ///         .with_start(0.0)?
 ///         .with_end(1.0)?
 ///         .build();
-///     let path = solver.solve_ivp(derivative, &mut ())?;
+///     let path = solver.solve_ivp(&derivative, &mut ())?;
 ///
 ///     for (time, state) in &path {
 ///         assert!((time.exp() - state.column(0)[0]).abs() <= 0.001);
@@ -227,4 +227,95 @@ impl<N: ComplexField> IVPSolver<N> for Euler<N> {
             Ok(())
         }
     }
+}
+
+/// Solve an initial value problem of y'(t) = f(t, y) numerically.
+///
+/// Tries to solve an initial value problem with an Adams predictor-corrector,
+/// the Runge-Kutta-Fehlberg method, and finally a backwards differentiation formula.
+/// This is probably what you want to use.
+///
+/// # Params
+/// `(start, end)` The start and end times for the IVP
+///
+/// `(dt_max, dt_min)` The maximum and minimum time step for solving
+///
+/// `y_0` The initial conditions at `start`
+///
+/// `f` the derivative function
+///
+/// `tol` acceptable error between steps.
+///
+/// `params` parameters to pass to the derivative function
+///
+/// # Examples
+/// ```
+/// use nalgebra::DVector;
+/// use bacon_sci::ivp::solve_ivp;
+/// fn derivatives(_: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String> {
+///     Ok(-DVector::from_column_slice(y))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let path = solve_ivp((0.0, 10.0), (0.1, 0.001), &[1.0], &derivatives, 0.00001, &mut ())?;
+///
+///     for step in path {
+///         assert!(((-step.0).exp() - step.1.column(0)[0]).abs() < 0.001);
+///     }
+///
+///     Ok(())
+/// }
+/// ```
+pub fn solve_ivp<
+    N: ComplexField,
+    T: Clone,
+    F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+>(
+    (start, end): (N::RealField, N::RealField),
+    (dt_max, dt_min): (N::RealField, N::RealField),
+    y_0: &[N],
+    f: &F,
+    tol: N::RealField,
+    params: &mut T,
+) -> Path<N, N::RealField> {
+    let solver = Adams::new()
+        .with_start(start)?
+        .with_end(end)?
+        .with_dt_max(dt_max)?
+        .with_dt_min(dt_min)?
+        .with_tolerance(tol)?
+        .with_initial_conditions(y_0)?
+        .build();
+
+    let path = solver.solve_ivp(f, params);
+
+    if let Ok(path) = path {
+        return Ok(path);
+    }
+
+    let solver = RK45::new()
+        .with_start(start)?
+        .with_end(end)?
+        .with_dt_max(dt_max)?
+        .with_dt_min(dt_min)?
+        .with_tolerance(tol)?
+        .with_initial_conditions(y_0)?
+        .build();
+
+    let path = solver.solve_ivp(f, params);
+
+    if let Ok(path) = path {
+        return Ok(path);
+    }
+
+    let solver = BDF6::new()
+        .with_start(start)?
+        .with_end(end)?
+        .with_dt_max(dt_max)?
+        .with_dt_min(dt_min)?
+        .with_tolerance(tol)?
+        .with_initial_conditions(y_0)?
+        .build();
+
+    solver.solve_ivp(f, params)
 }

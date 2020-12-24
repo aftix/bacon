@@ -33,7 +33,7 @@ fn rkf_test_exp() -> Result<(), String> {
         .with_tolerance(0.01)?
         .with_initial_conditions(&[1.0])?;
 
-    let path = solver.solve_ivp(exp_deriv, &mut ());
+    let path = solver.solve_ivp(&exp_deriv, &mut ());
 
     match path {
         Ok(path) => {
@@ -66,7 +66,7 @@ fn rkf_test_quadratic() -> Result<(), String> {
         .with_tolerance(1e-5)?
         .with_initial_conditions(&[1.0])?;
 
-    let path = solver.solve_ivp(quadratic_deriv, &mut ());
+    let path = solver.solve_ivp(&quadratic_deriv, &mut ());
 
     match path {
         Ok(path) => {
@@ -100,7 +100,7 @@ fn rkf_test_sine() -> Result<(), String> {
         .with_end(t_final)?
         .with_initial_conditions(&[0.0])?;
 
-    let path = solver.solve_ivp(sine_deriv, &mut ());
+    let path = solver.solve_ivp(&sine_deriv, &mut ());
 
     match path {
         Ok(path) => {
