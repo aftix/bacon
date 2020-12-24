@@ -29,9 +29,9 @@ pub trait AdamsSolver<N: ComplexField>: Sized {
     fn error_coefficient() -> N::RealField;
 
     /// Use AdamsInfo to solve an initial value problem
-    fn solve_ivp<T: Clone>(
+    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: super::DerivativeFunc<N, N::RealField, T>,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField>;
 
@@ -95,13 +95,17 @@ impl<N: ComplexField> AdamsInfo<N> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn rk4<N: ComplexField, T: Clone>(
+fn rk4<
+    N: ComplexField,
+    T: Clone,
+    F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+>(
     time: N::RealField,
     dt: N::RealField,
     initial: &[N],
     states: &mut VecDeque<(N::RealField, DVector<N>)>,
     derivs: &mut VecDeque<DVector<N>>,
-    f: super::DerivativeFunc<N, N::RealField, T>,
+    f: F,
     params: &mut T,
     num: usize,
 ) -> Result<(), String> {
@@ -148,9 +152,9 @@ impl<N: ComplexField> Default for AdamsInfo<N> {
 }
 
 impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
-    fn step<T: Clone>(
+    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: super::DerivativeFunc<N, N::RealField, T>,
+        f: &F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -474,9 +478,9 @@ impl<N: ComplexField> AdamsSolver<N> for Adams<N> {
         N::RealField::from_f64(19.0 / 270.0).unwrap()
     }
 
-    fn solve_ivp<T: Clone>(
+    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: super::DerivativeFunc<N, N::RealField, T>,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField> {
         self.info.solve_ivp(f, params)

@@ -22,8 +22,6 @@ pub enum IVPStatus<N: ComplexField> {
     Done,
 }
 
-type DerivativeFunc<Complex, Real, T> =
-    fn(Real, &[Complex], &mut T) -> Result<DVector<Complex>, String>;
 type Path<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 
 /// Trait defining what it means to be an IVP solver.
@@ -31,9 +29,9 @@ type Path<Complex, Real> = Result<Vec<(Real, DVector<Complex>)>, String>;
 pub trait IVPSolver<N: ComplexField>: Sized {
     /// Step forward in the solver. Returns if the solver is finished, produced
     /// an acceptable state, or needs to be redone.
-    fn step<T: Clone>(
+    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: DerivativeFunc<N, N::RealField, T>,
+        f: &F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String>;
     /// Set the error tolerance for this solver.
@@ -61,9 +59,9 @@ pub trait IVPSolver<N: ComplexField>: Sized {
     fn check_start(&self) -> Result<(), String>;
 
     /// Solve an initial value problem, consuming the solver
-    fn solve_ivp<T: Clone>(
+    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         mut self,
-        f: DerivativeFunc<N, N::RealField, T>,
+        f: F,
         params: &mut T,
     ) -> Path<N, N::RealField> {
         self.check_start()?;
@@ -73,7 +71,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
         path.push((time.unwrap(), init_conditions.unwrap()));
 
         'out: loop {
-            let step = self.step(f, params)?;
+            let step = self.step(&f, params)?;
             match step {
                 IVPStatus::Done => break 'out,
                 IVPStatus::Redo => {}
@@ -133,9 +131,9 @@ impl<N: ComplexField> Euler<N> {
 }
 
 impl<N: ComplexField> IVPSolver<N> for Euler<N> {
-    fn step<T: Clone>(
+    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: DerivativeFunc<N, N::RealField, T>,
+        f: &F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time >= self.end {
