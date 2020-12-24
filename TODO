@@ -1,6 +1,5 @@
 Bessel functions
 spherical bessel functions
-Backward differentiation formulas
 general purpose solve_ivp
 boundary value problems
 more special functions (scipy)

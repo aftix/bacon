@@ -51,10 +51,10 @@ pub fn integrate_gaussian<N: ComplexField>(
         );
 
         let mut area = N::zero();
-        for j in 0..zeros.len() {
-            let (_, deriv) = p_1.evaluate_derivative(zeros[j]);
-            let weight = two / ((N::one() - zeros[j].powi(2)) * deriv.powi(2));
-            area += weight * f(scale * zeros[j].real() + shift);
+        for zero in &zeros {
+            let (_, deriv) = p_1.evaluate_derivative(*zero);
+            let weight = two / ((N::one() - zero.powi(2)) * deriv.powi(2));
+            area += weight * f(scale * zero.real() + shift);
         }
         area *= N::from_real(shift);
 
@@ -123,10 +123,10 @@ pub fn integrate_hermite<N: ComplexField>(
 
         let mut area = N::zero();
         let two_power = N::from_u32(1 << (i - 1)).unwrap();
-        for j in 0..roots.len() {
+        for root in &roots {
             let weight = N::from_u32(factorial(i)).unwrap() * sqrt_pi * two_power
-                / (N::from_u32(i.pow(2)).unwrap() * h_0.evaluate(roots[j]).powi(2));
-            area += weight * f(roots[j].real());
+                / (N::from_u32(i.pow(2)).unwrap() * h_0.evaluate(*root).powi(2));
+            area += weight * f(root.real());
         }
 
         let error = (area - prev_area).abs();

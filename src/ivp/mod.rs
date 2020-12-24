@@ -8,9 +8,11 @@ use alga::general::ComplexField;
 use nalgebra::DVector;
 use num_traits::Zero;
 
-pub mod adams;
-pub mod rk;
+mod adams;
+mod bdf;
+mod rk;
 pub use adams::*;
+pub use bdf::*;
 pub use rk::*;
 
 /// Status of an IVP Solver after a step
