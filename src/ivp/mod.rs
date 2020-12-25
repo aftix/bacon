@@ -31,7 +31,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
     /// an acceptable state, or needs to be redone.
     fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String>;
     /// Set the error tolerance for this solver.
@@ -61,7 +61,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
     /// Solve an initial value problem, consuming the solver
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         mut self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> Path<N, N::RealField> {
         self.check_start()?;
@@ -102,7 +102,7 @@ pub trait IVPSolver<N: ComplexField>: Sized {
 ///         .with_start(0.0)?
 ///         .with_end(1.0)?
 ///         .build();
-///     let path = solver.solve_ivp(&derivative, &mut ())?;
+///     let path = solver.solve_ivp(derivative, &mut ())?;
 ///
 ///     for (time, state) in &path {
 ///         assert!((time.exp() - state.column(0)[0]).abs() <= 0.001);
@@ -133,7 +133,7 @@ impl<N: ComplexField> Euler<N> {
 impl<N: ComplexField> IVPSolver<N> for Euler<N> {
     fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time >= self.end {
@@ -257,7 +257,7 @@ impl<N: ComplexField> IVPSolver<N> for Euler<N> {
 /// }
 ///
 /// fn example() -> Result<(), String> {
-///     let path = solve_ivp((0.0, 10.0), (0.1, 0.001), &[1.0], &derivatives, 0.00001, &mut ())?;
+///     let path = solve_ivp((0.0, 10.0), (0.1, 0.001), &[1.0], derivatives, 0.00001, &mut ())?;
 ///
 ///     for step in path {
 ///         assert!(((-step.0).exp() - step.1.column(0)[0]).abs() < 0.001);
@@ -274,7 +274,7 @@ pub fn solve_ivp<
     (start, end): (N::RealField, N::RealField),
     (dt_max, dt_min): (N::RealField, N::RealField),
     y_0: &[N],
-    f: &F,
+    f: F,
     tol: N::RealField,
     params: &mut T,
 ) -> Path<N, N::RealField> {
@@ -287,7 +287,7 @@ pub fn solve_ivp<
         .with_initial_conditions(y_0)?
         .build();
 
-    let path = solver.solve_ivp(f, params);
+    let path = solver.solve_ivp(&f, params);
 
     if let Ok(path) = path {
         return Ok(path);
@@ -302,7 +302,7 @@ pub fn solve_ivp<
         .with_initial_conditions(y_0)?
         .build();
 
-    let path = solver.solve_ivp(f, params);
+    let path = solver.solve_ivp(&f, params);
 
     if let Ok(path) = path {
         return Ok(path);
@@ -317,5 +317,5 @@ pub fn solve_ivp<
         .with_initial_conditions(y_0)?
         .build();
 
-    solver.solve_ivp(f, params)
+    solver.solve_ivp(&f, params)
 }

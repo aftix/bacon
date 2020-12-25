@@ -43,7 +43,7 @@ pub trait RungeKuttaSolver<N: ComplexField>: Sized {
     /// Ideally, call RKInfo.solve_ivp
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField>;
 
@@ -109,7 +109,7 @@ impl<N: ComplexField> Default for RKInfo<N> {
 impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
     fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -311,7 +311,7 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
 ///         .with_tolerance(0.0001)?
 ///         .with_initial_conditions(&[1.0])?
 ///         .build();
-///     let path = rk45.solve_ivp(&derivatives, &mut ())?;
+///     let path = rk45.solve_ivp(derivatives, &mut ())?;
 ///     for (time, state) in &path {
 ///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
 ///     }
@@ -406,7 +406,7 @@ impl<N: ComplexField> RungeKuttaSolver<N> for RK45<N> {
 
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField> {
         self.info.solve_ivp(f, params)

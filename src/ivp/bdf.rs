@@ -40,7 +40,7 @@ pub trait BDFSolver<N: ComplexField>: Sized {
     /// Use BDFInfo to solve an initial value problem
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField>;
 
@@ -156,7 +156,7 @@ impl<N: ComplexField> Default for BDFInfo<N> {
 impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
     fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -172,7 +172,7 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
                 self.dt.unwrap(),
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.memory,
-                f,
+                &f,
                 params,
                 1,
             )?;
@@ -189,7 +189,7 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
                 self.dt.unwrap(),
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.memory,
-                f,
+                &f,
                 params,
                 self.higher_coffecients.len(),
             )?;
@@ -432,7 +432,7 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
 ///         .with_end(10.0)?
 ///         .with_initial_conditions(&[1.0])?
 ///         .build();
-///     let path = bdf.solve_ivp(&derivatives, &mut ())?;
+///     let path = bdf.solve_ivp(derivatives, &mut ())?;
 ///     for (time, state) in &path {
 ///         assert!(((-time).exp() - state.column(0)[0]).abs() < 0.001);
 ///     }
@@ -486,7 +486,7 @@ impl<N: ComplexField> BDFSolver<N> for BDF6<N> {
 
     fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
-        f: &F,
+        f: F,
         params: &mut T,
     ) -> super::Path<N, N::RealField> {
         self.info.solve_ivp(f, params)
