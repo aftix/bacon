@@ -237,16 +237,14 @@ pub fn chebyshev<N: ComplexField>(n: u32) -> Polynomial<N> {
         return polynomial![N::one(), N::zero()];
     }
 
-    let mut t_0 = polynomial![N::one()];
-    let mut t_1 = polynomial![N::one(), N::zero()];
-    let double = polynomial![N::from_i32(2).unwrap(), N::zero()];
-
-    for _ in 1..n {
-        let next = &double * &t_1 - &t_0;
-        t_0 = t_1;
-        t_1 = next;
+    if n % 2 == 0 {
+        let half = chebyshev(n / 2);
+        &half * &half * N::from_i32(2).unwrap() - polynomial![N::one()]
+    } else {
+        let half = chebyshev(n / 2);
+        let other_half = chebyshev(n / 2 + 1);
+        &half * &other_half * N::from_i32(2).unwrap() - polynomial![N::one(), N::zero()]
     }
-    t_1
 }
 
 /// Get the nth chebyshev polynomial of the second kind.
