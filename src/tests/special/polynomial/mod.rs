@@ -1,19 +1,20 @@
 use crate::special::{
-    chebyshev, chebyshev_second, hermite, hermite_zeros, laguerre, legendre, legendre_zeros,
+    chebyshev, chebyshev_second, hermite, hermite_zeros, laguerre, laguerre_zeros, legendre,
+    legendre_zeros,
 };
 
 #[test]
 fn legendre_test() {
-    let p = legendre::<f64>(0);
+    let p = legendre::<f64>(0, 1e-8).unwrap();
     assert_eq!(p.order(), 0);
     assert!(approx_eq!(f64, p.get_coefficient(0), 1.0, epsilon = 0.0001));
 
-    let p = legendre::<f64>(1);
+    let p = legendre::<f64>(1, 1e-8).unwrap();
     assert_eq!(p.order(), 1);
     assert!(approx_eq!(f64, p.get_coefficient(0), 0.0, epsilon = 0.0001));
     assert!(approx_eq!(f64, p.get_coefficient(1), 1.0, epsilon = 0.0001));
 
-    let p = legendre::<f64>(2);
+    let p = legendre::<f64>(2, 1e-8).unwrap();
     assert_eq!(p.order(), 2);
     assert!(approx_eq!(
         f64,
@@ -24,7 +25,7 @@ fn legendre_test() {
     assert!(approx_eq!(f64, p.get_coefficient(1), 0.0, epsilon = 0.0001));
     assert!(approx_eq!(f64, p.get_coefficient(2), 1.5, epsilon = 0.0001));
 
-    let p = legendre::<f64>(10);
+    let p = legendre::<f64>(10, 1e-8).unwrap();
     assert_eq!(p.order(), 10);
     assert!(approx_eq!(
         f64,
@@ -72,8 +73,8 @@ fn legendre_test() {
 #[test]
 fn legendre_zero_test() {
     for i in 1..20 {
-        let poly = legendre::<f64>(i);
-        let zeros = legendre_zeros::<f64>(i, 1e-8, 100).unwrap();
+        let poly = legendre::<f64>(i, 1e-8).unwrap();
+        let zeros = legendre_zeros::<f64>(i, 1e-8, 1e-8, 100).unwrap();
         for (ind, zero) in zeros.iter().enumerate() {
             assert!(approx_eq!(f64, poly.evaluate(*zero), 0.0, epsilon = 0.0001));
             for (j, other) in zeros.iter().enumerate() {
@@ -88,7 +89,7 @@ fn legendre_zero_test() {
 
 #[test]
 fn hermite_test() {
-    let h = hermite::<f64>(0);
+    let h = hermite::<f64>(0, 1e-8).unwrap();
     assert_eq!(h.order(), 0);
     assert!(approx_eq!(
         f64,
@@ -97,7 +98,7 @@ fn hermite_test() {
         epsilon = 0.0000001
     ));
 
-    let h = hermite::<f64>(1);
+    let h = hermite::<f64>(1, 1e-8).unwrap();
     assert_eq!(h.order(), 1);
     assert!(approx_eq!(
         f64,
@@ -112,7 +113,7 @@ fn hermite_test() {
         epsilon = 0.000001
     ));
 
-    let h = hermite::<f64>(2);
+    let h = hermite::<f64>(2, 1e-8).unwrap();
     assert_eq!(h.order(), 2);
     assert!(approx_eq!(
         f64,
@@ -123,7 +124,7 @@ fn hermite_test() {
     assert!(approx_eq!(f64, h.get_coefficient(1), 0.0, epsilon = 0.0001));
     assert!(approx_eq!(f64, h.get_coefficient(2), 4.0, epsilon = 0.0001));
 
-    let h = hermite::<f64>(10);
+    let h = hermite::<f64>(10, 1e-8).unwrap();
     assert_eq!(h.order(), 10);
     assert!(approx_eq!(
         f64,
@@ -170,9 +171,9 @@ fn hermite_test() {
 
 #[test]
 fn hermite_zero_test() {
-    for i in 1..10 {
-        let poly = hermite::<f64>(i);
-        let zeros = hermite_zeros::<f64>(i, 1e-10, 100).unwrap();
+    for i in 1..11 {
+        let poly = hermite::<f64>(i, 1e-8).unwrap();
+        let zeros = hermite_zeros::<f64>(i, 1e-10, 1e-8, 10000).unwrap();
         for (ind, zero) in zeros.iter().enumerate() {
             assert!(approx_eq!(f64, poly.evaluate(*zero), 0.0, epsilon = 0.005));
             for (j, other) in zeros.iter().enumerate() {
@@ -187,11 +188,11 @@ fn hermite_zero_test() {
 
 #[test]
 fn laguerre_test() {
-    let l = laguerre::<f64>(0);
+    let l = laguerre::<f64>(0, 1e-8).unwrap();
     assert_eq!(l.order(), 0);
     assert!(approx_eq!(f64, l.get_coefficient(0), 1.0, epsilon = 0.0001));
 
-    let l = laguerre::<f64>(1);
+    let l = laguerre::<f64>(1, 1e-8).unwrap();
     assert_eq!(l.order(), 1);
     assert!(approx_eq!(f64, l.get_coefficient(0), 1.0, epsilon = 0.0001));
     assert!(approx_eq!(
@@ -201,7 +202,7 @@ fn laguerre_test() {
         epsilon = 0.0001
     ));
 
-    let l = laguerre::<f64>(6);
+    let l = laguerre::<f64>(6, 1e-8).unwrap();
     assert_eq!(l.order(), 6);
     assert!(approx_eq!(
         f64,
@@ -248,17 +249,34 @@ fn laguerre_test() {
 }
 
 #[test]
+fn laguerre_zero_test() {
+    for i in 1..10 {
+        let poly = laguerre::<f64>(i, 1e-20).unwrap();
+        let zeros = laguerre_zeros::<f64>(i, 1e-8, 1e-40, 100).unwrap();
+        for (ind, zero) in zeros.iter().enumerate() {
+            assert!(approx_eq!(f64, poly.evaluate(*zero), 0.0, epsilon = 0.0001));
+            for (j, other) in zeros.iter().enumerate() {
+                if j == ind {
+                    continue;
+                }
+                assert!(!approx_eq!(f64, *zero, *other, epsilon = 0.0001));
+            }
+        }
+    }
+}
+
+#[test]
 fn chebyshev_test() {
-    let t = chebyshev::<f64>(0);
+    let t = chebyshev::<f64>(0, 1e-8).unwrap();
     assert_eq!(t.order(), 0);
     assert!(approx_eq!(f64, t.get_coefficient(0), 1.0, epsilon = 0.0001),);
 
-    let t = chebyshev::<f64>(1);
+    let t = chebyshev::<f64>(1, 1e-8).unwrap();
     assert_eq!(t.order(), 1);
     assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001),);
     assert!(approx_eq!(f64, t.get_coefficient(1), 1.0, epsilon = 0.0001),);
 
-    let t = chebyshev::<f64>(11);
+    let t = chebyshev::<f64>(11, 1e-8).unwrap();
     assert_eq!(t.order(), 11);
     assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001));
     assert!(approx_eq!(
@@ -311,16 +329,16 @@ fn chebyshev_test() {
 
 #[test]
 fn chebyshev_second_test() {
-    let t = chebyshev_second::<f64>(0);
+    let t = chebyshev_second::<f64>(0, 1e-8).unwrap();
     assert_eq!(t.order(), 0);
     assert!(approx_eq!(f64, t.get_coefficient(0), 1.0, epsilon = 0.0001),);
 
-    let t = chebyshev_second::<f64>(1);
+    let t = chebyshev_second::<f64>(1, 1e-8).unwrap();
     assert_eq!(t.order(), 1);
     assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001),);
     assert!(approx_eq!(f64, t.get_coefficient(1), 2.0, epsilon = 0.0001),);
 
-    let t = chebyshev_second::<f64>(9);
+    let t = chebyshev_second::<f64>(9, 1e-8).unwrap();
     assert_eq!(t.order(), 9);
     assert!(approx_eq!(f64, t.get_coefficient(0), 0.0, epsilon = 0.0001));
     assert!(approx_eq!(

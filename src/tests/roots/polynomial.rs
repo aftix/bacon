@@ -41,40 +41,60 @@ fn muller() {
 fn polynomial_roots() {
     let poly = polynomial![1.0, -1.0];
 
-    let roots = poly.roots(&[0.0], 1e-10, 1000).unwrap();
+    let roots = poly.roots(1e-10, 1000).unwrap();
     assert_eq!(roots.len(), 1);
     assert!(approx_eq!(f64, roots[0].re, 1.0, epsilon = 1e-10));
     assert!(approx_eq!(f64, roots[0].im, 0.0, epsilon = 1e-10));
 
     let poly = polynomial![0.0];
-    let roots = poly.roots(&[], 1e-10, 1000).unwrap();
+    let roots = poly.roots(1e-10, 1000).unwrap();
     assert_eq!(roots.len(), 1);
     assert!(approx_eq!(f64, roots[0].re, 0.0, epsilon = 1e-10));
     assert!(approx_eq!(f64, roots[0].im, 0.0, epsilon = 1e-10));
 
     let poly = polynomial![1.0];
-    let roots = poly.roots(&[0.0], 1e-10, 1000);
+    let roots = poly.roots(1e-10, 1000);
     if let Ok(_) = roots {
         panic!("Should have not found a root");
     }
 
     let poly = polynomial![1.0, 0.0, -1.0];
-    let roots = poly.roots(&[2.0, -2.0], 1e-10, 1000).unwrap();
+    let cmplx = poly.make_complex();
+    let roots = poly.roots(1e-10, 1000).unwrap();
     assert_eq!(roots.len(), 2);
-    assert!(approx_eq!(f64, roots[0].re, 1.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[0].im, 0.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[1].re, -1.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[1].im, 0.0, epsilon = 0.0000001));
+    for (ind, root) in roots.iter().enumerate() {
+        let val = cmplx.evaluate(*root);
+        assert!(approx_eq!(f64, val.re, 0.0, epsilon = 1e-10));
+        assert!(approx_eq!(f64, val.im, 0.0, epsilon = 1e-10));
+        for (j, r) in roots.iter().enumerate() {
+            if j == ind {
+                continue;
+            }
+            assert!(
+                !(approx_eq!(f64, root.re, r.re, epsilon = 0.0001)
+                    && approx_eq!(f64, root.im, r.im, epsilon = 0.0001))
+            );
+        }
+    }
 
     let poly = polynomial![1.0, -2.0, -2.0, 1.0];
-    let roots = poly.roots(&[-0.5, 0.3, 3.0], 1e-10, 1000).unwrap();
+    let cmplx = poly.make_complex();
+    let roots = poly.roots(1e-10, 1000).unwrap();
     assert_eq!(roots.len(), 3);
-    assert!(approx_eq!(f64, roots[0].re, -1.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[0].im, 0.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[1].re, 0.38197, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[1].im, 0.0, epsilon = 0.0000001));
-    assert!(approx_eq!(f64, roots[2].re, 2.6180, epsilon = 0.0001));
-    assert!(approx_eq!(f64, roots[2].im, 0.0, epsilon = 0.0000001));
+    for (ind, root) in roots.iter().enumerate() {
+        let val = cmplx.evaluate(*root);
+        assert!(approx_eq!(f64, val.re, 0.0, epsilon = 1e-10));
+        assert!(approx_eq!(f64, val.im, 0.0, epsilon = 1e-10));
+        for (j, r) in roots.iter().enumerate() {
+            if j == ind {
+                continue;
+            }
+            assert!(
+                !(approx_eq!(f64, root.re, r.re, epsilon = 0.0001)
+                    && approx_eq!(f64, root.im, r.im, epsilon = 0.0001))
+            );
+        }
+    }
 
     let poly = polynomial![
         Complex64::new(5.0, 0.0),
@@ -83,25 +103,20 @@ fn polynomial_roots() {
         Complex64::new(2.0, 0.0),
         Complex64::new(1.0, 0.0)
     ];
-    let roots = poly
-        .roots(
-            &[
-                Complex64::new(-0.4, -0.25),
-                Complex64::new(-0.4, 0.25),
-                Complex64::new(1.0, -0.6),
-                Complex64::new(1.0, 0.6),
-            ],
-            1e-10,
-            1000,
-        )
-        .unwrap();
+    let roots = poly.roots(1e-10, 1000).unwrap();
     assert_eq!(roots.len(), 4);
-    assert!(approx_eq!(f64, roots[0].re, -0.39932, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[0].im, -0.25396, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[1].re, -0.39932, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[1].im, 0.25396, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[2].re, 0.69932, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[2].im, -0.63562, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[3].re, 0.69932, epsilon = 0.00001));
-    assert!(approx_eq!(f64, roots[3].im, 0.63562, epsilon = 0.00001));
+    for (ind, root) in roots.iter().enumerate() {
+        let val = poly.evaluate(*root);
+        assert!(approx_eq!(f64, val.re, 0.0, epsilon = 1e-10));
+        assert!(approx_eq!(f64, val.im, 0.0, epsilon = 1e-10));
+        for (j, r) in roots.iter().enumerate() {
+            if j == ind {
+                continue;
+            }
+            assert!(
+                !(approx_eq!(f64, root.re, r.re, epsilon = 0.0001)
+                    && approx_eq!(f64, root.im, r.im, epsilon = 0.0001))
+            );
+        }
+    }
 }
