@@ -5,18 +5,86 @@
  */
 
 use alga::general::{ComplexField, RealField};
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, One, Zero};
 use std::f64;
 
 mod gaussian;
 pub use gaussian::*;
 mod tables;
 
+use tables::WEIGHTS_DE;
+
+// Taken and modified from https://github.com/Eh2406/quadrature/blob/master/src/double_exponential/mod.rs
+// published under the BSD license
 fn integrate_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
-    _f: F,
-    _tol: N::RealField,
+    mut f: F,
+    tol: N::RealField,
 ) -> Result<N, String> {
-    Err("integrate: maximum iterations exceeded".to_owned())
+    let mut error_estimate = N::RealField::one() + tol;
+    let mut num_function_evaluations = 1;
+    let mut current_delta = N::RealField::zero();
+
+    let half = N::from_f64(0.5).unwrap();
+    let one_point_nine = N::RealField::from_f64(1.9).unwrap();
+    let two_point_one = N::RealField::from_f64(2.1).unwrap();
+    let pi = N::from_f64(f64::consts::PI).unwrap();
+
+    let mut integral = pi * f(N::RealField::zero());
+
+    for &weight in &WEIGHTS_DE {
+        let new_contribution = weight
+            .iter()
+            .map(|&(w, x)| {
+                let x = N::RealField::from_f64(x).unwrap();
+                N::from_f64(w).unwrap() * (f(x) + f(-x))
+            })
+            .fold(N::zero(), |sum, x| sum + x);
+        num_function_evaluations += 2 * weight.len();
+
+        // difference in consecutive integral estimates
+        let previous_delta_ln = current_delta.ln();
+        current_delta = (half * integral - new_contribution).abs();
+        integral = half * integral + new_contribution;
+
+        // Once convergence kicks in, error is approximately squared at each step.
+        // Determine whether we're in the convergent region by looking at the trend in the error.
+        if num_function_evaluations <= 13 {
+            // level <= 1
+            continue; // previousDelta meaningless, so cannot check convergence.
+        }
+
+        // Exact comparison with zero is harmless here.  Could possibly be replaced with
+        // a small positive upper limit on the size of currentDelta, but determining
+        // that upper limit would be difficult.  At worse, the loop is executed more
+        // times than necessary.  But no infinite loop can result since there is
+        // an upper bound on the loop variable.
+        if current_delta == N::RealField::zero() {
+            error_estimate = N::RealField::zero();
+            break;
+        }
+        // previousDelta != 0 or would have been kicked out previously
+        let r = current_delta.ln() / previous_delta_ln;
+
+        if r > one_point_nine && r < two_point_one {
+            // If convergence theory applied perfectly, r would be 2 in the convergence region.
+            // r close to 2 is good enough. We expect the difference between this integral estimate
+            // and the next one to be roughly delta^2.
+            error_estimate = current_delta * current_delta;
+        } else {
+            // Not in the convergence region.  Assume only that error is decreasing.
+            error_estimate = current_delta;
+        }
+
+        if error_estimate < tol {
+            break;
+        }
+    }
+
+    if error_estimate < tol {
+        Ok(integral)
+    } else {
+        Err("integrate: maximum iterations exceeded".to_owned())
+    }
 }
 
 pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
@@ -24,7 +92,6 @@ pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
     right: N::RealField,
     mut f: F,
     tol: N::RealField,
-    _n_max: usize,
 ) -> Result<N, String> {
     if left >= right {
         return Err("integrate: left must be less than right".to_owned());

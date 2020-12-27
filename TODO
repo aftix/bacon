@@ -5,7 +5,7 @@ more special functions (scipy)
 Double integrals
 triple integrals
 Linear algebra algorithms?
-Euler-chromer method
+Euler-cromer method
 PDEs
 method of false position
 better README
@@ -14,7 +14,6 @@ Gauss-Laguerre integration
 statistics distributions
 generalized laguerre polynomials
 Airy function
-Tanh-Sinh quadrature
 Aberth method
 Real roots
 lower-order methods (RK23, Adams3, BDF3)

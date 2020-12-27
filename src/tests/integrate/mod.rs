@@ -1,6 +1,6 @@
 use crate::integrate::{
-    integrate_chebyshev, integrate_chebyshev_second, integrate_fixed, integrate_gaussian,
-    integrate_hermite, integrate_simpson,
+    integrate, integrate_chebyshev, integrate_chebyshev_second, integrate_fixed,
+    integrate_gaussian, integrate_hermite, integrate_simpson,
 };
 use std::f64;
 
@@ -26,6 +26,21 @@ fn x(x: f64) -> f64 {
 
 fn xsquared(x: f64) -> f64 {
     x.powi(2)
+}
+
+#[test]
+fn test_integrate() {
+    let area = integrate(0.0, f64::consts::PI, sin, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 2.0, epsilon = 0.0001));
+    let area = integrate(0.0, 10.0, exp, 0.00001).unwrap();
+    assert!(approx_eq!(
+        f64,
+        area,
+        (10.0 as f64).exp() - 1.0,
+        epsilon = 0.0001
+    ));
+    let area = integrate(0.0, f64::consts::PI, sinsin, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 1.78649, epsilon = 0.0001));
 }
 
 #[test]
