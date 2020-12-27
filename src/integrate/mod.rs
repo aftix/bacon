@@ -6,16 +6,57 @@
 
 use alga::general::{ComplexField, RealField};
 use num_traits::FromPrimitive;
+use std::f64;
 
 mod gaussian;
 pub use gaussian::*;
+mod tables;
+
+fn integrate_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    _f: F,
+    _tol: N::RealField,
+) -> Result<N, String> {
+    Err("integrate: maximum iterations exceeded".to_owned())
+}
+
+pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    left: N::RealField,
+    right: N::RealField,
+    mut f: F,
+    tol: N::RealField,
+    _n_max: usize,
+) -> Result<N, String> {
+    if left >= right {
+        return Err("integrate: left must be less than right".to_owned());
+    }
+    if !tol.is_sign_positive() {
+        return Err("integrate: tolerance must be positive".to_owned());
+    }
+
+    let half = N::RealField::from_f64(0.5).unwrap();
+
+    let scale = (right - left) * half;
+    let shift = (right + left) * half;
+    let scale_cmplx = N::from_real(scale);
+
+    let fun = |x: N::RealField| -> N {
+        let out = f(scale * x + shift);
+        if out.is_finite() {
+            out
+        } else {
+            N::zero()
+        }
+    };
+
+    Ok(integrate_core(fun, tol)? * scale_cmplx)
+}
 
 /// Numerically integrate a function over an interval within a tolerance.
 ///
 /// Given a function and end points, numerically integrate using adaptive
 /// simpson's rule until the error is within tolerance or the maximum
 /// iterations are exceeded.
-pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
+pub fn integrate_simpson<N: ComplexField, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
     mut f: F,

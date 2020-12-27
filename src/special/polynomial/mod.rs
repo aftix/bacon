@@ -146,21 +146,21 @@ pub fn hermite_zeros<N: ComplexField>(
     })))
 }
 
-fn factorial(k: u32) -> u32 {
-    let mut acc = 1;
+fn factorial<N: ComplexField>(k: u32) -> N {
+    let mut acc = N::one();
     for i in 2..=k {
-        acc *= i;
+        acc *= N::from_u32(i).unwrap();
     }
     acc
 }
 
-fn choose(n: u32, k: u32) -> u32 {
-    let mut acc = 1;
+fn choose<N: ComplexField>(n: u32, k: u32) -> N {
+    let mut acc = N::one();
     for i in n - k + 1..=n {
-        acc *= i;
+        acc *= N::from_u32(i).unwrap();
     }
     for i in 2..=k {
-        acc /= i;
+        acc /= N::from_u32(i).unwrap();
     }
     acc
 }
@@ -186,8 +186,7 @@ pub fn laguerre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial
     let mut coefficients = Vec::with_capacity(n as usize + 1);
     for k in 0..=n {
         coefficients.push(
-            N::from_u32(choose(n, k)).unwrap() / N::from_u32(factorial(k)).unwrap()
-                * if k % 2 == 0 { N::one() } else { -N::one() },
+            choose::<N>(n, k) / factorial::<N>(k) * if k % 2 == 0 { N::one() } else { -N::one() },
         );
     }
 
