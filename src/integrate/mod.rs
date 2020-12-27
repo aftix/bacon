@@ -15,10 +15,10 @@ pub use gaussian::*;
 /// Given a function and end points, numerically integrate using adaptive
 /// simpson's rule until the error is within tolerance or the maximum
 /// iterations are exceeded.
-pub fn integrate<N: ComplexField>(
+pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
-    f: fn(N::RealField) -> N,
+    mut f: F,
     tol: N::RealField,
     n_max: usize,
 ) -> Result<N, String> {
@@ -120,10 +120,10 @@ pub fn integrate<N: ComplexField>(
 ///
 /// Given a function and end points, numerically integrate
 /// using Romberg integration. Uses `n` steps.
-pub fn integrate_fixed<N: ComplexField>(
+pub fn integrate_fixed<N: ComplexField, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
-    f: fn(N::RealField) -> N,
+    mut f: F,
     n: usize,
 ) -> Result<N, String> {
     if left >= right {

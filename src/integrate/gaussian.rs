@@ -8,10 +8,10 @@ use std::iter::FromIterator;
 /// Given a function and end points, numerically intgerate using Gaussian-Legedre
 /// Quadrature until two consecutive iterations are within tolerance or the maximum
 /// number of iterations is exceeded.
-pub fn integrate_gaussian<N: ComplexField>(
+pub fn integrate_gaussian<N: ComplexField, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
-    f: fn(N::RealField) -> N,
+    mut f: F,
     tol: N::RealField,
     n_max: usize,
 ) -> Result<N, String> {
@@ -72,8 +72,8 @@ fn factorial(n: u32) -> u32 {
 /// Given a function, numerically integrate using Gaussian-Hermite
 /// Quadrature until two consecutive iterations are within tolerance or
 /// the maximum number of iterations is exceeded.
-pub fn integrate_hermite<N: ComplexField>(
-    f: fn(N::RealField) -> N,
+pub fn integrate_hermite<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    mut f: F,
     tol: N::RealField,
     n_max: usize,
 ) -> Result<N, String> {
@@ -127,8 +127,8 @@ pub fn integrate_hermite<N: ComplexField>(
 /// Given a function, numerically integrate using Chebyshev-Gaussian Quadrature
 /// of the first kind until two consecutive iterations are within tolerance
 /// or the maximum number of iterations is exceeded.
-pub fn integrate_chebyshev<N: ComplexField>(
-    f: fn(N::RealField) -> N,
+pub fn integrate_chebyshev<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    mut f: F,
     tol: N::RealField,
     n_max: usize,
 ) -> Result<N, String> {
@@ -165,8 +165,8 @@ pub fn integrate_chebyshev<N: ComplexField>(
 /// Given a function, numerically integrate using Chebyshev-Gaussian Quadrature
 /// of the second kind until two consecutive iterations are within tolerance
 /// or the maximum number of iterations is exceeded.
-pub fn integrate_chebyshev_second<N: ComplexField>(
-    f: fn(N::RealField) -> N,
+pub fn integrate_chebyshev_second<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    mut f: F,
     tol: N::RealField,
     n_max: usize,
 ) -> Result<N, String> {

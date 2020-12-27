@@ -41,9 +41,9 @@ pub use polynomial::*;
 ///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn bisection<N: RealField, F: Fn(N) -> N>(
+pub fn bisection<N: RealField, F: FnMut(N) -> N>(
     (mut left, mut right): (N, N),
-    f: F,
+    mut f: F,
     tol: N,
     n_max: usize,
 ) -> Result<N, String> {
@@ -179,9 +179,9 @@ pub fn steffensen<N: RealField + From<f64> + Copy>(
 ///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton<N: ComplexField, F: Fn(&[N]) -> DVector<N>>(
+pub fn newton<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
     initial: &[N],
-    f: F,
+    mut f: F,
     f_deriv: fn(&[N]) -> DVector<N>,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
@@ -250,9 +250,9 @@ pub fn newton<N: ComplexField, F: Fn(&[N]) -> DVector<N>>(
 ///   let solution = secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn secant<N: ComplexField, F: Fn(&[N]) -> DVector<N>>(
+pub fn secant<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
     initial: (&[N], &[N]),
-    f: F,
+    mut f: F,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
 ) -> Result<DVector<N>, String> {

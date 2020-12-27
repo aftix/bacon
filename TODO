@@ -12,10 +12,10 @@ better README
 blogpost
 Gauss-Laguerre integration
 statistics distributions
-Laguerre polynomial roots
 generalized laguerre polynomials
 Airy function
 Tanh-Sinh quadrature
 Aberth method
 Real roots
 lower-order methods (RK23, Adams3, BDF3)
+chebyshev zeros
