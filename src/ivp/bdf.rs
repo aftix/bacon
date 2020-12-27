@@ -38,7 +38,7 @@ pub trait BDFSolver<N: ComplexField>: Sized {
     fn lower_coefficients() -> Vec<N::RealField>;
 
     /// Use BDFInfo to solve an initial value problem
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,
@@ -103,13 +103,13 @@ impl<N: ComplexField> BDFInfo<N> {
 fn rk4<
     N: ComplexField,
     T: Clone,
-    F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
 >(
     time: N::RealField,
     dt: N::RealField,
     initial: &[N],
     states: &mut VecDeque<(N::RealField, DVector<N>)>,
-    f: F,
+    mut f: F,
     params: &mut T,
     num: usize,
 ) -> Result<(), String> {
@@ -154,9 +154,9 @@ impl<N: ComplexField> Default for BDFInfo<N> {
 }
 
 impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
-    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: F,
+        mut f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -172,7 +172,7 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
                 self.dt.unwrap(),
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.memory,
-                &f,
+                &mut f,
                 params,
                 1,
             )?;
@@ -189,7 +189,7 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
                 self.dt.unwrap(),
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.memory,
-                &f,
+                &mut f,
                 params,
                 self.higher_coffecients.len(),
             )?;
@@ -219,6 +219,17 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
             }
             state + y
         };
+
+        let higher = secant(
+            (
+                self.memory[self.memory.len() - 1].1.column(0).as_slice(),
+                self.memory[self.memory.len() - 2].1.column(0).as_slice(),
+            ),
+            higher_func,
+            self.tolerance.unwrap(),
+            1000,
+        )?;
+
         let lower_func = |y: &[N]| -> DVector<N> {
             let y = DVector::from_column_slice(y);
             let mut state = -f(
@@ -233,16 +244,6 @@ impl<N: ComplexField> IVPSolver<N> for BDFInfo<N> {
             }
             state + y
         };
-
-        let higher = secant(
-            (
-                self.memory[self.memory.len() - 1].1.column(0).as_slice(),
-                self.memory[self.memory.len() - 2].1.column(0).as_slice(),
-            ),
-            higher_func,
-            self.tolerance.unwrap(),
-            1000,
-        )?;
         let lower = secant(
             (
                 self.memory[self.memory.len() - 1].1.column(0).as_slice(),
@@ -484,7 +485,7 @@ impl<N: ComplexField> BDFSolver<N> for BDF6<N> {
         ]
     }
 
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,

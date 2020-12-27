@@ -41,7 +41,7 @@ pub trait RungeKuttaSolver<N: ComplexField>: Sized {
     fn error_coefficients() -> Vec<N::RealField>;
 
     /// Ideally, call RKInfo.solve_ivp
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,
@@ -107,9 +107,9 @@ impl<N: ComplexField> Default for RKInfo<N> {
 }
 
 impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
-    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: F,
+        mut f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -404,7 +404,7 @@ impl<N: ComplexField> RungeKuttaSolver<N> for RK45<N> {
         ]
     }
 
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,

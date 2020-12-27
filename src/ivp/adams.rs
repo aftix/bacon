@@ -29,7 +29,7 @@ pub trait AdamsSolver<N: ComplexField>: Sized {
     fn error_coefficient() -> N::RealField;
 
     /// Use AdamsInfo to solve an initial value problem
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,
@@ -98,14 +98,14 @@ impl<N: ComplexField> AdamsInfo<N> {
 fn rk4<
     N: ComplexField,
     T: Clone,
-    F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>,
 >(
     time: N::RealField,
     dt: N::RealField,
     initial: &[N],
     states: &mut VecDeque<(N::RealField, DVector<N>)>,
     derivs: &mut VecDeque<DVector<N>>,
-    f: F,
+    mut f: F,
     params: &mut T,
     num: usize,
 ) -> Result<(), String> {
@@ -152,9 +152,9 @@ impl<N: ComplexField> Default for AdamsInfo<N> {
 }
 
 impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
-    fn step<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         &mut self,
-        f: F,
+        mut f: F,
         params: &mut T,
     ) -> Result<IVPStatus<N>, String> {
         if self.time.unwrap() >= self.end.unwrap() {
@@ -171,7 +171,7 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.states,
                 &mut self.memory,
-                &f,
+                &mut f,
                 params,
                 1,
             )?;
@@ -189,7 +189,7 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
                 self.state.as_ref().unwrap().column(0).as_slice(),
                 &mut self.states,
                 &mut self.memory,
-                &f,
+                &mut f,
                 params,
                 self.predictor_coefficients.len(),
             )?;
@@ -478,7 +478,7 @@ impl<N: ComplexField> AdamsSolver<N> for Adams<N> {
         N::RealField::from_f64(19.0 / 270.0).unwrap()
     }
 
-    fn solve_ivp<T: Clone, F: Fn(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
+    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<DVector<N>, String>>(
         self,
         f: F,
         params: &mut T,
