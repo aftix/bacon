@@ -2,7 +2,8 @@ use alga::general::{ComplexField, RealField};
 use num_traits::{FromPrimitive, One, Zero};
 
 use super::tables::{
-    WEIGHTS_CHEBYSHEV, WEIGHTS_CHEBYSHEV_SECOND, WEIGHTS_HERMITE, WEIGHTS_LEGENDRE,
+    WEIGHTS_CHEBYSHEV, WEIGHTS_CHEBYSHEV_SECOND, WEIGHTS_HERMITE, WEIGHTS_LAGUERRE,
+    WEIGHTS_LEGENDRE,
 };
 
 fn integrate_gaussian_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
@@ -62,6 +63,41 @@ pub fn integrate_gaussian<N: ComplexField, F: FnMut(N::RealField) -> N>(
         integrate_gaussian_core(fun, N::RealField::from_f64(0.25).unwrap() * tol / scale)?
             * scale_cmplx,
     )
+}
+
+/// Numerically integrate an integral of the form int_0^inf f(x) exp(-x) dx
+/// within a tolerance.
+///
+/// Given a function, numerically integrate using Gaussian-Laguerre
+/// Quadrature until two consecutive iterations are within tolerance or
+/// the maximum number of iterations is exceeded.
+pub fn integrate_laguerre<N: ComplexField, F: FnMut(N::RealField) -> N>(
+    mut f: F,
+    tol: N::RealField,
+) -> Result<N, String> {
+    if !tol.is_sign_positive() {
+        return Err("integrate_laguerre: tol must be positive".to_owned());
+    }
+
+    let mut prev_area = N::zero();
+    let mut prev_err = N::RealField::one() + tol;
+
+    for weight in WEIGHTS_LAGUERRE {
+        let area = weight
+            .iter()
+            .map(|(z, w)| N::from_f64(*w).unwrap() * f(N::RealField::from_f64(*z).unwrap()))
+            .fold(N::zero(), |sum, x| sum + x);
+
+        let err = (area - prev_area).abs();
+        if err < tol && prev_err < tol {
+            return Ok(area);
+        }
+
+        prev_area = area;
+        prev_err = err;
+    }
+
+    Err("integrate_laguerre: maximum number of iterations exceeded".to_owned())
 }
 
 /// Numerically integrate an integral of the form int_-inf^inf f(x) exp(-x^2) dx

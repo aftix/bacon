@@ -10,7 +10,6 @@ PDEs
 method of false position
 better README
 blogpost
-Gauss-Laguerre integration
 statistics distributions
 generalized laguerre polynomials
 Airy function
@@ -18,3 +17,6 @@ Aberth method
 Real roots
 lower-order methods (RK23, Adams3, BDF3)
 chebyshev zeros
+Bernoulli numbers
+Euler numbers
+Catalan Numbers

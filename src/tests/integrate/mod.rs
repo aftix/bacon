@@ -1,6 +1,6 @@
 use crate::integrate::{
     integrate, integrate_chebyshev, integrate_chebyshev_second, integrate_fixed,
-    integrate_gaussian, integrate_hermite, integrate_simpson,
+    integrate_gaussian, integrate_hermite, integrate_laguerre, integrate_simpson,
 };
 use std::f64;
 
@@ -91,7 +91,6 @@ fn test_integrate_gaussian() {
 #[test]
 fn test_integrate_hermite() {
     let area = integrate_hermite(one, 0.00001).unwrap();
-    println!("{} {}", area, f64::consts::PI.sqrt());
     assert!(approx_eq!(
         f64,
         area,
@@ -107,8 +106,24 @@ fn test_integrate_hermite() {
         f64::consts::PI.sqrt() / 2.0,
         epsilon = 0.0001
     ));
-    let area = integrate_hermite(sin, 0.0001).unwrap();
+    let area = integrate_hermite(sin, 0.00001).unwrap();
     assert!(approx_eq!(f64, area, 0.0, epsilon = 0.0001));
+    let area = integrate_hermite(sinsin, 0.0001).unwrap();
+    assert!(approx_eq!(f64, area, 0.0, epsilon = 0.0001))
+}
+
+#[test]
+fn test_integrate_laguerre() {
+    let area = integrate_laguerre(one, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 1.0, epsilon = 0.0001));
+    let area = integrate_laguerre(x, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 1.0, epsilon = 0.0001));
+    let area = integrate_laguerre(xsquared, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 2.0, epsilon = 0.0001));
+    let area = integrate_laguerre(sin, 0.00001).unwrap();
+    assert!(approx_eq!(f64, area, 0.5, epsilon = 0.0001));
+    let area = integrate_laguerre(sinsin, 0.01).unwrap();
+    assert!(approx_eq!(f64, area, 0.4518851, epsilon = 0.01));
 }
 
 #[test]
