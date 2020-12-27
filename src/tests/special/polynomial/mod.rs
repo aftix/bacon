@@ -171,7 +171,7 @@ fn hermite_test() {
 
 #[test]
 fn hermite_zero_test() {
-    for i in 1..11 {
+    for i in 1..15 {
         let poly = hermite::<f64>(i, 1e-8).unwrap();
         let zeros = hermite_zeros::<f64>(i, 1e-10, 1e-8, 10000).unwrap();
         for (ind, zero) in zeros.iter().enumerate() {

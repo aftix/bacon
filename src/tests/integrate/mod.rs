@@ -75,7 +75,7 @@ fn test_integrate_gaussian() {
 
 #[test]
 fn test_integrate_hermite() {
-    let area = integrate_hermite(one, 0.0001).unwrap();
+    let area = integrate_hermite(one, 0.00001).unwrap();
     println!("{} {}", area, f64::consts::PI.sqrt());
     assert!(approx_eq!(
         f64,
@@ -83,9 +83,9 @@ fn test_integrate_hermite() {
         f64::consts::PI.sqrt(),
         epsilon = 0.0001
     ));
-    let area = integrate_hermite(x, 0.0001).unwrap();
+    let area = integrate_hermite(x, 0.00001).unwrap();
     assert!(approx_eq!(f64, area, 0.0, epsilon = 0.0001));
-    let area = integrate_hermite(xsquared, 0.0001).unwrap();
+    let area = integrate_hermite(xsquared, 0.00001).unwrap();
     assert!(approx_eq!(
         f64,
         area,

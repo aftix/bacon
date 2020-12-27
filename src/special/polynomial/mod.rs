@@ -1,5 +1,7 @@
 use crate::polynomial::Polynomial;
+use crate::roots::newton_polynomial;
 use alga::general::ComplexField;
+use num_traits::FromPrimitive;
 use std::iter::FromIterator;
 
 /// Get the nth legendre polynomial.
@@ -137,13 +139,28 @@ pub fn hermite_zeros<N: ComplexField>(
 
     let poly: Polynomial<N> = hermite(n, poly_tol)?;
 
-    Ok(Vec::from_iter(poly.roots(tol, n_max)?.iter().map(|c| {
-        if c.re.abs() < tol {
-            N::zero()
-        } else {
-            N::from_real(c.re)
-        }
-    })))
+    // Get initial guesses of zeros with asymptotic formula
+    let mut zeros = Vec::with_capacity(n as usize);
+    let special = N::from_f64(3.3721 / 6.0.cbrt()).unwrap();
+    let third = N::RealField::from_f64(1.0 / 3.0).unwrap();
+    for i in 1..=n {
+        let sqrt = N::from_u32(2 * i).unwrap().sqrt();
+        zeros.push(sqrt - special * sqrt.powf(-third));
+    }
+
+    // Use newton's method and deflation to refine guesses
+    let mut deflator = poly.clone();
+    let mut zs = Vec::with_capacity(zeros.len());
+    for z in &zeros {
+        let zero = newton_polynomial(*z, &deflator, tol, n_max)?;
+        let divisor = polynomial![N::one(), -zero];
+        let (quotient, _) = deflator.divide(&divisor)?;
+        // Adjust for round off error
+        let zero = newton_polynomial(zero, &poly, tol, n_max)?;
+        zs.push(zero);
+        deflator = quotient;
+    }
+    Ok(zs)
 }
 
 fn factorial<N: ComplexField>(k: u32) -> N {
