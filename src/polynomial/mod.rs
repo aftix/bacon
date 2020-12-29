@@ -386,7 +386,7 @@ impl<N: ComplexField> Polynomial<N> {
         let len = working.len();
         for s in 1..(len as f64).log2() as usize + 1 {
             let m = 1 << s;
-            let angle = f64::consts::TAU / m as f64;
+            let angle = 2.0 * f64::consts::PI / m as f64;
             let angle = N::RealField::from_f64(angle).unwrap();
             let root_of_unity = Complex::<N::RealField>::new(angle.cos(), angle.sin());
             let mut w = Complex::<N::RealField>::new(N::RealField::one(), N::RealField::zero());
@@ -412,7 +412,7 @@ impl<N: ComplexField> Polynomial<N> {
         let len = working.len();
         for s in 1..(len as f64).log2() as usize + 1 {
             let m = 1 << s;
-            let angle = -f64::consts::TAU / m as f64;
+            let angle = -2.0 * f64::consts::PI / m as f64;
             let angle = N::RealField::from_f64(angle).unwrap();
             let root_of_unity = Complex::<N::RealField>::new(angle.cos(), angle.sin());
             let mut w = Complex::<N::RealField>::new(N::RealField::one(), N::RealField::zero());
