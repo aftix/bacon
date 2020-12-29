@@ -205,24 +205,39 @@ impl<N: ComplexField> IVPSolver<N> for AdamsInfo<N> {
         let two_real = N::RealField::from_i32(2).unwrap();
         let four_real = N::RealField::from_i32(4).unwrap();
 
-        let mut wp = self.state.as_ref().unwrap().clone();
-        for (ind, coef) in self.predictor_coefficients.iter().rev().enumerate() {
-            wp += &self.memory[ind] * N::from_real(*coef) * N::from_real(self.dt.unwrap());
-        }
+        let wp = &self.state.as_ref().unwrap();
+        let wp = DVector::from_iterator(
+            wp.column(0).as_slice().len(),
+            wp.column(0).iter().enumerate().map(|(ind, y)| {
+                let mut acc = N::zero();
+                let dt = N::from_real(self.dt.unwrap());
+                for (j, coef) in self.predictor_coefficients.iter().rev().enumerate() {
+                    acc += self.memory[j].column(0)[ind] * N::from_real(*coef) * dt;
+                }
+                *y + acc
+            }),
+        );
+
         let implicit = f(
             self.time.unwrap() + self.dt.unwrap(),
             self.state.as_ref().unwrap().column(0).as_slice(),
             params,
         )?;
-        let mut wc = self.state.as_ref().unwrap().clone();
-        wc += &implicit
-            * N::from_real(self.dt.unwrap())
-            * N::from_real(self.corrector_coefficients[0]);
-        for (ind, coef) in self.corrector_coefficients.iter().enumerate().skip(1) {
-            wc += &self.memory[self.memory.len() - ind - 1]
-                * N::from_real(*coef)
-                * N::from_real(self.dt.unwrap());
-        }
+        let wc = &self.state.as_ref().unwrap();
+        let wc = DVector::from_iterator(
+            wc.column(0).as_slice().len(),
+            wc.column(0).iter().enumerate().map(|(ind, y)| {
+                let dt = N::from_real(self.dt.unwrap());
+                let mut acc =
+                    implicit.column(0)[ind] * N::from_real(self.corrector_coefficients[0]) * dt;
+                for (j, coef) in self.corrector_coefficients.iter().enumerate().skip(1) {
+                    acc += self.memory[self.memory.len() - j - 1].column(0)[ind]
+                        * N::from_real(*coef)
+                        * dt;
+                }
+                *y + acc
+            }),
+        );
 
         let diff = &wc - &wp;
         let error = self.error_coefficient / self.dt.unwrap() * diff.dot(&diff).sqrt().abs();

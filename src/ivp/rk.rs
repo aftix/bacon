@@ -131,14 +131,24 @@ impl<N: ComplexField> IVPSolver<N> for RKInfo<N> {
 
         let mut half_steps: Vec<DVector<N>> = Vec::with_capacity(num_k);
         for i in 0..num_k {
-            let mut state = self.state.as_ref().unwrap().clone();
-            for (j, k) in half_steps.iter().enumerate() {
-                state += k * N::from_real(self.k_coefficients[i][j]);
-            }
+            let state = &self.state.as_ref().unwrap();
+            let state: Vec<_> = state
+                .column(0)
+                .as_slice()
+                .iter()
+                .enumerate()
+                .map(|(ind, y)| {
+                    let mut acc = N::zero();
+                    for (j, k) in half_steps.iter().enumerate() {
+                        acc += k[ind] * N::from_real(self.k_coefficients[i][j]);
+                    }
+                    *y + acc
+                })
+                .collect();
             half_steps.push(
                 f(
                     self.time.unwrap() + self.a_coefficients[i] * self.dt.unwrap(),
-                    state.column(0).as_slice(),
+                    &state,
                     &mut params.clone(),
                 )? * N::from_real(self.dt.unwrap()),
             );
