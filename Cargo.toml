@@ -8,7 +8,7 @@ description="Scientific computing in Rust"
 homepage="https://github.com/aftix/bacon"
 repository="https://github.com/aftix/bacon"
 readme="README.md"
-keywords=["numeric", "science", "ivp", "ode", "root", "polynomial", "integration", "quadrature"]
+keywords=["numeric", "science", "integration", "quadrature"]
 categories=["science"]
 
 [features]
