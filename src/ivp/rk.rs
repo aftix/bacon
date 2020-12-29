@@ -179,10 +179,9 @@ where
             output = true;
             *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
             for (ind, k) in half_steps.iter().enumerate() {
-                *self
-                    .state
-                    .get_or_insert(VectorN::from_column_slice(&[N::zero()])) +=
-                    k * N::from_real(self.avg_coefficients[ind]);
+                *self.state.get_or_insert(VectorN::from_iterator(
+                    [N::zero()].repeat(self.state.as_ref().unwrap().as_slice().len()),
+                )) += k * N::from_real(self.avg_coefficients[ind]);
             }
         }
 

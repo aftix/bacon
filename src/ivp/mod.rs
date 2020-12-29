@@ -167,10 +167,9 @@ where
             params,
         )?;
 
-        *self
-            .state
-            .get_or_insert(VectorN::from_column_slice(&[N::zero()])) +=
-            deriv * N::from_real(self.dt.unwrap());
+        *self.state.get_or_insert(VectorN::from_iterator(
+            [N::zero()].repeat(self.state.as_ref().unwrap().as_slice().len()),
+        )) += deriv * N::from_real(self.dt.unwrap());
         *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
         Ok(IVPStatus::Ok(vec![(
             self.time.unwrap(),
