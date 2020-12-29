@@ -5,14 +5,14 @@
  */
 
 use crate::ivp::{Euler, IVPSolver};
-use nalgebra::DVector;
+use nalgebra::{VectorN, U1};
 
-fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String> {
-    Ok(DVector::from_column_slice(y))
+fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
+    Ok(VectorN::<f64, U1>::from_column_slice(y))
 }
 
-fn quadratic_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<DVector<f64>, String> {
-    Ok(DVector::from_iterator(y.len(), [-2.0 * t].repeat(y.len())))
+fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
+    Ok(VectorN::<f64, U1>::from_column_slice(&[-2.0 * t]))
 }
 
 // Test euler method on y = exp(x), y' = exp(x) = y, y(0) = 1

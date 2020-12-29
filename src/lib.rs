@@ -7,11 +7,12 @@
 #[macro_use]
 extern crate lazy_static;
 #[allow(unused_imports)]
-#[macro_use]
-extern crate float_cmp;
-
 extern crate num_complex;
 extern crate num_traits;
+
+#[cfg(test)]
+#[macro_use]
+extern crate float_cmp;
 
 pub mod constants;
 pub mod ivp;

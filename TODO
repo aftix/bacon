@@ -15,8 +15,11 @@ generalized laguerre polynomials
 Airy function
 Aberth method
 Real roots
-lower-order methods (RK23, Adams3, BDF3)
+lower-order methods (RK23, Adams3, BDF2)
 chebyshev zeros
 Bernoulli numbers
 Euler numbers
 Catalan Numbers
+Halley's method
+Multidimensional Newton's method
+Least-squares regression

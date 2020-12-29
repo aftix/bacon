@@ -5,7 +5,7 @@
  */
 
 use crate::roots;
-use nalgebra::DVector;
+use nalgebra::{VectorN, U1, U2};
 use std::f64;
 
 mod polynomial;
@@ -35,26 +35,24 @@ fn poly(x: f64) -> f64 {
 }
 
 // Solve x^n = exp(x) where n is 2+index (since x = exp(x) has no solution)
-fn exp_newton(x: &[f64]) -> DVector<f64> {
-    DVector::from_iterator(
-        x.len(),
+fn exp_newton(x: &[f64]) -> VectorN<f64, U2> {
+    VectorN::<f64, U2>::from_iterator(
         x.iter()
             .enumerate()
             .map(|(i, x)| x.exp() - x.powi(i as i32 + 2)),
     )
 }
 
-fn exp_newton_deriv(x: &[f64]) -> DVector<f64> {
-    DVector::from_iterator(
-        x.len(),
+fn exp_newton_deriv(x: &[f64]) -> VectorN<f64, U2> {
+    VectorN::<f64, U2>::from_iterator(
         x.iter()
             .enumerate()
             .map(|(i, x)| x.exp() - ((i + 2) as f64) * x.powi(i as i32 + 1)),
     )
 }
 
-fn cos_secant(x: &[f64]) -> DVector<f64> {
-    DVector::from_iterator(x.len(), x.iter().map(|x| x.cos() - x))
+fn cos_secant(x: &[f64]) -> VectorN<f64, U1> {
+    VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.cos() - x))
 }
 
 #[test]

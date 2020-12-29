@@ -5,7 +5,7 @@
  */
 
 use alga::general::{ComplexField, RealField};
-use nalgebra::DVector;
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN};
 
 mod polynomial;
 pub use polynomial::*;
@@ -30,7 +30,6 @@ pub use polynomial::*;
 ///
 /// # Examples
 /// ```
-/// use nalgebra::DVector;
 /// use bacon_sci::roots::bisection;
 ///
 /// fn cubic(x: f64) -> f64 {
@@ -165,28 +164,36 @@ pub fn steffensen<N: RealField + From<f64> + Copy>(
 ///
 /// # Examples
 /// ```
-/// use nalgebra::DVector;
+/// use nalgebra::{VectorN, U1};
 /// use bacon_sci::roots::newton;
-/// fn cubic(x: &[f64]) -> DVector<f64> {
-///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
+/// fn cubic(x: &[f64]) -> VectorN<f64, U1> {
+///   VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.powi(3)))
 /// }
 ///
-/// fn cubic_deriv(x: &[f64]) -> DVector<f64> {
-///   DVector::from_iterator(x.len(), x.iter().map(|x| 3.0*x.powi(2)))
+/// fn cubic_deriv(x: &[f64]) -> VectorN<f64, U1> {
+///  VectorN::<f64, U1>::from_iterator(x.iter().map(|x| 3.0*x.powi(2)))
 /// }
 /// //...
 /// fn example() {
 ///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
+pub fn newton<
+    N: ComplexField,
+    S: DimName,
+    F: FnMut(&[N]) -> VectorN<N, S>,
+    G: FnMut(&[N]) -> VectorN<N, S>,
+>(
     initial: &[N],
     mut f: F,
-    f_deriv: fn(&[N]) -> DVector<N>,
+    mut f_deriv: G,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<DVector<N>, String> {
-    let mut guess = DVector::from_column_slice(initial);
+) -> Result<VectorN<N, S>, String>
+where
+    DefaultAllocator: Allocator<N, S>,
+{
+    let mut guess = VectorN::from_column_slice(initial);
     let mut norm = guess.dot(&guess).sqrt().abs();
     let mut n = 0;
 
@@ -195,10 +202,9 @@ pub fn newton<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
     }
 
     while n < n_max {
-        let f_val = f(guess.column(0).as_slice());
-        let f_deriv_val = f_deriv(guess.column(0).as_slice());
-        let adjustment = DVector::from_iterator(
-            guess.column(0).len(),
+        let f_val = f(guess.as_slice());
+        let f_deriv_val = f_deriv(guess.as_slice());
+        let adjustment = VectorN::from_iterator(
             f_val
                 .column(0)
                 .iter()
@@ -240,26 +246,29 @@ pub fn newton<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
 ///
 /// # Examples
 /// ```
-/// use nalgebra::DVector;
+/// use nalgebra::{VectorN, U1};
 /// use bacon_sci::roots::secant;
-/// fn cubic(x: &[f64]) -> DVector<f64> {
-///   DVector::from_iterator(x.len(), x.iter().map(|x| x.powi(3)))
+/// fn cubic(x: &[f64]) -> VectorN<f64, U1> {
+///   VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.powi(3)))
 /// }
 /// //...
 /// fn example() {
 ///   let solution = secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn secant<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
+pub fn secant<N: ComplexField, S: DimName, F: FnMut(&[N]) -> VectorN<N, S>>(
     initial: (&[N], &[N]),
     mut f: F,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<DVector<N>, String> {
+) -> Result<VectorN<N, S>, String>
+where
+    DefaultAllocator: Allocator<N, S>,
+{
     let mut n = 0;
 
-    let mut left = DVector::from_column_slice(initial.0);
-    let mut right = DVector::from_column_slice(initial.1);
+    let mut left = VectorN::from_column_slice(initial.0);
+    let mut right = VectorN::from_column_slice(initial.1);
 
     let mut left_val = f(initial.0);
     let mut right_val = f(initial.1);
@@ -270,13 +279,9 @@ pub fn secant<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
     }
 
     while n <= n_max {
-        let adjustment = DVector::from_iterator(
-            right_val.iter().len(),
-            right_val.iter().enumerate().map(|(i, q)| {
-                *q * (*right.get(i).unwrap() - *left.get(i).unwrap())
-                    / (*q - *left_val.get(i).unwrap())
-            }),
-        );
+        let adjustment = VectorN::from_iterator(right_val.iter().enumerate().map(|(i, q)| {
+            *q * (*right.get(i).unwrap() - *left.get(i).unwrap()) / (*q - *left_val.get(i).unwrap())
+        }));
         let new_guess = &right - adjustment;
         let new_norm = new_guess.dot(&new_guess).sqrt().abs();
         if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
@@ -287,58 +292,9 @@ pub fn secant<N: ComplexField, F: FnMut(&[N]) -> DVector<N>>(
         left_val = right_val;
         left = right;
         right = new_guess;
-        right_val = f(right.column(0).as_slice());
+        right_val = f(right.as_slice());
         n += 1;
     }
 
     Err("Secant: Maximum iterations exceeded".to_owned())
 }
-
-/*
-pub fn muller<N: ComplexField+From<f64>+Into<N>>(
-  initial: (N, N, N),
-  f: fn(N) -> N,
-  tol: <N as ComplexField>::RealField,
-  n_max: usize
-) -> Result<N, String> {
-  let mut n = 0;
-
-  let mut poly_0 = initial.0;
-  let mut poly_1 = initial.1;
-  let mut poly_2 = initial.2;
-
-  let mut h_1 = poly_1 - poly_0;
-  let mut h_2 = poly_2 - poly_1;
-  let mut f_at_1 = f(poly_1);
-  let mut f_at_2 = f(poly_2);
-  let mut delta_1 = (f_at_1 - f(poly_0)) / h_2;
-  let mut delta_2 = (f_at_2 - f_at_1) / h_2;
-  let mut d = (delta_2 - delta_1) / (h_2 + h_1);
-
-  while n < n_max {
-    let b = delta_2 + h_2*d;
-    let determinant = (b.powi(2) - N::from(4.0)*f_at_2*d).sqrt();
-    let error = if (b - determinant).abs() < (b + determinant).abs() { b + determinant } else { b - determinant };
-    let h = N::from(-2.0) * f_at_2 / error;
-    let p = poly_2 + h;
-
-    if h.abs() <= tol {
-      return Ok(p);
-    }
-
-    poly_0 = poly_1;
-    poly_1 = poly_2;
-    poly_2 = p;
-    f_at_1 = f(poly_1);
-    f_at_2 = f(poly_2);
-    h_1 = poly_1 - poly_2;
-    h_2 = poly_2 - poly_1;
-    delta_1 = (f_at_1 - f(poly_0)) / h_1;
-    delta_2 = (f_at_2 - f_at_1) / h_2;
-    d = (delta_2 - delta_1) / (h_1 + h_2);
-    n += 1;
-  }
-
-  Err("Muller: maximum iterations exceeded".to_owned())
-}
-*/
