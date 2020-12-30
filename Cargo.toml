@@ -1,6 +1,6 @@
 [package]
 name = "bacon-sci"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["aftix <aftix@aftix.xyz>"]
 edition = "2018"
 license="MIT"

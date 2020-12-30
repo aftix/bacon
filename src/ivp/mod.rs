@@ -5,7 +5,7 @@
  */
 
 use alga::general::ComplexField;
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U6};
 use num_traits::Zero;
 
 mod adams;
@@ -298,6 +298,11 @@ pub fn solve_ivp<
 ) -> Path<N, N::RealField, S>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U6>,
+    DefaultAllocator: Allocator<N, S, U6>,
+    DefaultAllocator: Allocator<N, U6, U6>,
+    DefaultAllocator: Allocator<N::RealField, U6>,
+    DefaultAllocator: Allocator<N::RealField, U6, U6>,
 {
     let solver = Adams::new()
         .with_start(start)?
@@ -308,22 +313,22 @@ where
         .with_initial_conditions(y_0)?
         .build();
 
-    let path = solver.solve_ivp(&mut f, params);
+    let path = solver.solve_ivp(&mut f, &mut params.clone());
 
     if let Ok(path) = path {
         return Ok(path);
     }
 
-    let solver = RK45::new()
+    let solver: RK45<N, S> = RK45::new()
+        .with_initial_conditions(y_0)?
         .with_start(start)?
         .with_end(end)?
         .with_dt_max(dt_max)?
         .with_dt_min(dt_min)?
         .with_tolerance(tol)?
-        .with_initial_conditions(y_0)?
         .build();
 
-    let path = solver.solve_ivp(&mut f, params);
+    let path = solver.solve_ivp(&mut f, &mut params.clone());
 
     if let Ok(path) = path {
         return Ok(path);
