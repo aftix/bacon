@@ -7,20 +7,23 @@
 use super::{IVPSolver, IVPStatus};
 use crate::roots::secant;
 use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U7};
 use num_traits::{FromPrimitive, Zero};
 use std::collections::VecDeque;
 
 /// This trait allows a struct to be used in the BDF
 ///
 /// Types implementing BDFSolver should have a BDFInfo to
-/// handle the actual IVP solving.
+/// handle the actual IVP solving. O should be one more than
+/// the order of the higher-order solver (to allow room for the
+/// coefficient on f).
 ///
 /// # Examples
 /// See `struct BDF6` for an example of implementing this trait.
-pub trait BDFSolver<N: ComplexField, S: DimName>: Sized
+pub trait BDFSolver<N: ComplexField, S: DimName, O: DimName>: Sized
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N::RealField, O>,
 {
     /// The polynomial interpolation coefficients for the higher-order
     /// method. Should start
@@ -29,7 +32,7 @@ where
     /// coefficients for the previous terms
     /// should have the sign as if they're on the
     /// same side of the = as the next state.
-    fn higher_coefficients() -> Vec<N::RealField>;
+    fn higher_coefficients() -> VectorN<N::RealField, O>;
     /// The polynomial interpolation coefficients for the lower-order
     /// method. Must be
     /// one less in length than higher_coefficients.
@@ -38,7 +41,7 @@ where
     /// coefficients for the previous terms
     /// should have the sign as if they're on the
     /// same side of the = as the next state.
-    fn lower_coefficients() -> Vec<N::RealField>;
+    fn lower_coefficients() -> VectorN<N::RealField, O>;
 
     /// Use BDFInfo to solve an initial value problem
     fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
@@ -68,9 +71,10 @@ where
 /// BDFSolver to correctly implement the coefficients.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
-pub struct BDFInfo<N: ComplexField, S: DimName>
+pub struct BDFInfo<N: ComplexField, S: DimName, O: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, O>,
 {
     dt: Option<N::RealField>,
     time: Option<N::RealField>,
@@ -79,16 +83,17 @@ where
     dt_max: Option<N::RealField>,
     dt_min: Option<N::RealField>,
     tolerance: Option<N::RealField>,
-    higher_coffecients: Vec<N::RealField>,
-    lower_coefficients: Vec<N::RealField>,
+    higher_coffecients: VectorN<N, O>,
+    lower_coefficients: VectorN<N, O>,
     memory: VecDeque<(N::RealField, VectorN<N, S>)>,
     nflag: bool,
     last: bool,
 }
 
-impl<N: ComplexField, S: DimName> BDFInfo<N, S>
+impl<N: ComplexField, S: DimName, O: DimName> BDFInfo<N, S, O>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, O>,
 {
     pub fn new() -> Self {
         BDFInfo {
@@ -99,8 +104,8 @@ where
             dt_max: None,
             dt_min: None,
             tolerance: None,
-            higher_coffecients: vec![],
-            lower_coefficients: vec![],
+            higher_coffecients: VectorN::<N, O>::zero(),
+            lower_coefficients: VectorN::<N, O>::zero(),
             memory: VecDeque::new(),
             nflag: false,
             last: false,
@@ -156,18 +161,20 @@ where
     Ok(())
 }
 
-impl<N: ComplexField, S: DimName> Default for BDFInfo<N, S>
+impl<N: ComplexField, S: DimName, O: DimName> Default for BDFInfo<N, S, O>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, O>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<N: ComplexField, S: DimName> IVPSolver<N, S> for BDFInfo<N, S>
+impl<N: ComplexField, S: DimName, O: DimName> IVPSolver<N, S> for BDFInfo<N, S, O>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, O>,
 {
     fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
         &mut self,
@@ -221,16 +228,17 @@ where
         let two_real = N::RealField::from_i32(2).unwrap();
 
         let higher_func = |y: &[N]| -> VectorN<N, S> {
-            let y = VectorN::from_column_slice(y);
+            let y = VectorN::<N, S>::from_column_slice(y);
             let mut state = -f(
                 self.time.unwrap() + self.dt.unwrap(),
                 y.as_slice(),
                 &mut params.clone(),
             )
             .unwrap()
-                * N::from_real(self.dt.unwrap() * self.higher_coffecients[0]);
+                * N::from_real(self.dt.unwrap())
+                * self.higher_coffecients[0];
             for (ind, coeff) in self.higher_coffecients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * N::from_real(*coeff);
+                state += &self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -246,16 +254,17 @@ where
         )?;
 
         let lower_func = |y: &[N]| -> VectorN<N, S> {
-            let y = VectorN::from_column_slice(y);
+            let y = VectorN::<N, S>::from_column_slice(y);
             let mut state = -f(
                 self.time.unwrap() + self.dt.unwrap(),
                 y.as_slice(),
                 &mut params.clone(),
             )
             .unwrap()
-                * N::from_real(self.dt.unwrap() * self.lower_coefficients[0]);
+                * N::from_real(self.dt.unwrap())
+                * self.lower_coefficients[0];
             for (ind, coeff) in self.lower_coefficients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * N::from_real(*coeff);
+                state += &self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -382,7 +391,7 @@ where
     }
 
     fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.state = Some(VectorN::from_column_slice(start));
+        self.state = Some(VectorN::<N, S>::from_column_slice(start));
         Ok(self)
     }
 
@@ -459,18 +468,26 @@ where
 pub struct BDF6<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U7>,
+    DefaultAllocator: Allocator<N::RealField, U7>,
 {
-    info: BDFInfo<N, S>,
+    info: BDFInfo<N, S, U7>,
 }
 
 impl<N: ComplexField, S: DimName> BDF6<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U7>,
+    DefaultAllocator: Allocator<N::RealField, U7>,
 {
     pub fn new() -> Self {
         let mut info = BDFInfo::new();
-        info.higher_coffecients = Self::higher_coefficients();
-        info.lower_coefficients = Self::lower_coefficients();
+        info.higher_coffecients = VectorN::<N, U7>::from_iterator(
+            Self::higher_coefficients().iter().map(|&x| N::from_real(x)),
+        );
+        info.lower_coefficients = VectorN::<N, U7>::from_iterator(
+            Self::lower_coefficients().iter().map(|&x| N::from_real(x)),
+        );
 
         BDF6 { info }
     }
@@ -479,18 +496,22 @@ where
 impl<N: ComplexField, S: DimName> Default for BDF6<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U7>,
+    DefaultAllocator: Allocator<N::RealField, U7>,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<N: ComplexField, S: DimName> BDFSolver<N, S> for BDF6<N, S>
+impl<N: ComplexField, S: DimName> BDFSolver<N, S, U7> for BDF6<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U7>,
+    DefaultAllocator: Allocator<N::RealField, U7>,
 {
-    fn higher_coefficients() -> Vec<N::RealField> {
-        vec![
+    fn higher_coefficients() -> VectorN<N::RealField, U7> {
+        VectorN::<N::RealField, U7>::from_column_slice(&[
             N::RealField::from_f64(60.0 / 147.0).unwrap(),
             N::RealField::from_f64(-360.0 / 147.0).unwrap(),
             N::RealField::from_f64(450.0 / 147.0).unwrap(),
@@ -498,18 +519,19 @@ where
             N::RealField::from_f64(225.0 / 147.0).unwrap(),
             N::RealField::from_f64(-72.0 / 147.0).unwrap(),
             N::RealField::from_f64(10.0 / 147.0).unwrap(),
-        ]
+        ])
     }
 
-    fn lower_coefficients() -> Vec<N::RealField> {
-        vec![
+    fn lower_coefficients() -> VectorN<N::RealField, U7> {
+        VectorN::<N::RealField, U7>::from_column_slice(&[
             N::RealField::from_f64(60.0 / 137.0).unwrap(),
             N::RealField::from_f64(-300.0 / 137.0).unwrap(),
             N::RealField::from_f64(300.0 / 137.0).unwrap(),
             N::RealField::from_f64(-200.0 / 137.0).unwrap(),
             N::RealField::from_f64(75.0 / 137.0).unwrap(),
             N::RealField::from_f64(-12.0 / 137.0).unwrap(),
-        ]
+            N::RealField::zero(),
+        ])
     }
 
     fn solve_ivp<
@@ -559,11 +581,13 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> From<BDF6<N, S>> for BDFInfo<N, S>
+impl<N: ComplexField, S: DimName> From<BDF6<N, S>> for BDFInfo<N, S, U7>
 where
     DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U7>,
+    DefaultAllocator: Allocator<N::RealField, U7>,
 {
-    fn from(bdf: BDF6<N, S>) -> BDFInfo<N, S> {
+    fn from(bdf: BDF6<N, S>) -> BDFInfo<N, S, U7> {
         bdf.info
     }
 }
