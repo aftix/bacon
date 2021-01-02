@@ -30,7 +30,7 @@ fn rkf_test_exp() -> Result<(), String> {
         .with_dt_max(0.01)?
         .with_start(t_initial)?
         .with_end(t_final)?
-        .with_tolerance(0.01)?
+        .with_tolerance(0.00001)?
         .with_initial_conditions(&[1.0])?;
 
     let path = solver.solve_ivp(&exp_deriv, &mut ());
