@@ -15,7 +15,7 @@ generalized laguerre polynomials
 Airy function
 Aberth method
 Real roots
-lower-order methods (RK23, Adams3, BDF2)
+lower-order methods (Adams3, BDF2)
 chebyshev zeros
 Bernoulli numbers
 Euler numbers

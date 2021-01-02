@@ -6,7 +6,7 @@
 
 use super::{IVPSolver, IVPStatus};
 use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, MatrixMN, VectorN, U6};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, MatrixMN, VectorN, U4, U6};
 use num_traits::{FromPrimitive, Zero};
 
 /// This trait allows a struct to be used in the Runge-Kutta solver.
@@ -563,6 +563,210 @@ where
     DefaultAllocator: Allocator<N::RealField, U6>,
 {
     fn from(rk: RK45<N, S>) -> RKInfo<N, S, U6> {
+        rk.info
+    }
+}
+
+/// Bogacki-Shampine method for solving an IVP.
+///
+/// Defines the Butch Tableaux for a 5(4) order adaptive
+/// runge-kutta method. Uses RKInfo to do the actual solving.
+/// Provides an interface for setting the conditions on RKInfo.
+///
+/// # Examples
+/// ```
+/// use nalgebra::{VectorN, U1};
+/// use bacon_sci::ivp::{RK23, RungeKuttaSolver};
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<VectorN<f64, U1>, String> {
+///     Ok(VectorN::<f64, U1>::from_column_slice(state))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let rk45 = RK23::new()
+///         .with_dt_max(0.1)?
+///         .with_dt_min(0.001)?
+///         .with_start(0.0)?
+///         .with_end(10.0)?
+///         .with_tolerance(0.0001)?
+///         .with_initial_conditions(&[1.0])?
+///         .build();
+///     let path = rk45.solve_ivp(derivatives, &mut ())?;
+///     for (time, state) in &path {
+///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
+///     }
+///     Ok(())
+/// }
+/// ```
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+pub struct RK23<N: ComplexField, S: DimName>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U4>,
+    DefaultAllocator: Allocator<N, U4, U4>,
+    DefaultAllocator: Allocator<N, S, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4, U4>,
+{
+    info: RKInfo<N, S, U4>,
+}
+
+impl<N: ComplexField, S: DimName> RK23<N, S>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U4>,
+    DefaultAllocator: Allocator<N, U4, U4>,
+    DefaultAllocator: Allocator<N, S, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4, U4>,
+{
+    pub fn new() -> Self {
+        let mut info: RKInfo<N, S, U4> = RKInfo::new();
+        info.a_coefficients = VectorN::<N, U4>::from_iterator(
+            Self::t_coefficients()
+                .as_slice()
+                .iter()
+                .map(|x| N::from_real(*x)),
+        );
+        info.k_coefficients = MatrixMN::<N, U4, U4>::from_iterator(
+            Self::k_coefficients()
+                .as_slice()
+                .iter()
+                .map(|x| N::from_real(*x)),
+        );
+        info.avg_coefficients = VectorN::<N, U4>::from_iterator(
+            Self::avg_coefficients()
+                .as_slice()
+                .iter()
+                .map(|x| N::from_real(*x)),
+        );
+        info.error_coefficients = VectorN::<N, U4>::from_iterator(
+            Self::error_coefficients()
+                .as_slice()
+                .iter()
+                .map(|x| N::from_real(*x)),
+        );
+        RK23 { info }
+    }
+}
+
+impl<N: ComplexField, S: DimName> RungeKuttaSolver<N, S, U4> for RK23<N, S>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U4>,
+    DefaultAllocator: Allocator<N, U4, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4, U4>,
+    DefaultAllocator: Allocator<N, S, U4>,
+{
+    fn t_coefficients() -> VectorN<N::RealField, U4> {
+        VectorN::<N::RealField, U4>::from_column_slice(&[
+            N::RealField::from_f64(0.0).unwrap(),
+            N::RealField::from_f64(0.5).unwrap(),
+            N::RealField::from_f64(0.75).unwrap(),
+            N::RealField::from_f64(1.0).unwrap(),
+        ])
+    }
+
+    fn k_coefficients() -> MatrixMN<N::RealField, U4, U4> {
+        MatrixMN::<N::RealField, U4, U4>::new(
+            // Row 0
+            N::RealField::zero(),
+            N::RealField::zero(),
+            N::RealField::zero(),
+            N::RealField::zero(),
+            // Row 1
+            N::RealField::from_f64(0.5).unwrap(),
+            N::RealField::zero(),
+            N::RealField::zero(),
+            N::RealField::zero(),
+            // Row 2
+            N::RealField::zero(),
+            N::RealField::from_f64(0.75).unwrap(),
+            N::RealField::zero(),
+            N::RealField::zero(),
+            // Row 3
+            N::RealField::from_f64(2.0 / 9.0).unwrap(),
+            N::RealField::from_f64(1.0 / 3.0).unwrap(),
+            N::RealField::from_f64(4.0 / 9.0).unwrap(),
+            N::RealField::zero(),
+        )
+    }
+
+    fn avg_coefficients() -> VectorN<N::RealField, U4> {
+        VectorN::<N::RealField, U4>::from_column_slice(&[
+            N::RealField::from_f64(2.0 / 9.0).unwrap(),
+            N::RealField::from_f64(1.0 / 3.0).unwrap(),
+            N::RealField::from_f64(4.0 / 9.0).unwrap(),
+            N::RealField::zero(),
+        ])
+    }
+
+    fn error_coefficients() -> VectorN<N::RealField, U4> {
+        VectorN::<N::RealField, U4>::from_column_slice(&[
+            N::RealField::from_f64(2.0 / 9.0 - 7.0 / 24.0).unwrap(),
+            N::RealField::from_f64(1.0 / 3.0 - 0.25).unwrap(),
+            N::RealField::from_f64(4.0 / 9.0 - 1.0 / 3.0).unwrap(),
+            N::RealField::from_f64(-1.0 / 8.0).unwrap(),
+        ])
+    }
+
+    fn solve_ivp<
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+    >(
+        self,
+        f: F,
+        params: &mut T,
+    ) -> super::Path<N, N::RealField, S> {
+        self.info.solve_ivp(f, params)
+    }
+
+    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_tolerance(tol)?;
+        Ok(self)
+    }
+
+    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_max(max)?;
+        Ok(self)
+    }
+
+    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_min(min)?;
+        Ok(self)
+    }
+
+    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_start(t_initial)?;
+        Ok(self)
+    }
+
+    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_end(t_final)?;
+        Ok(self)
+    }
+
+    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
+        self.info = self.info.with_initial_conditions(start)?;
+        Ok(self)
+    }
+
+    fn build(self) -> Self {
+        self
+    }
+}
+
+impl<N: ComplexField, S: DimName> From<RK23<N, S>> for RKInfo<N, S, U4>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U4>,
+    DefaultAllocator: Allocator<N, S, U4>,
+    DefaultAllocator: Allocator<N, U6, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4>,
+    DefaultAllocator: Allocator<N::RealField, U4>,
+{
+    fn from(rk: RK23<N, S>) -> RKInfo<N, S, U4> {
         rk.info
     }
 }
