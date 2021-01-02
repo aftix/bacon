@@ -7,7 +7,7 @@
 use super::{IVPSolver, IVPStatus};
 use crate::roots::secant;
 use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U7};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U3, U7};
 use num_traits::{FromPrimitive, Zero};
 use std::collections::VecDeque;
 
@@ -588,6 +588,156 @@ where
     DefaultAllocator: Allocator<N::RealField, U7>,
 {
     fn from(bdf: BDF6<N, S>) -> BDFInfo<N, S, U7> {
+        bdf.info
+    }
+}
+
+/// 2nd order backwards differentiation formula method for
+/// solving an initial value problem.
+///
+/// Defines the higher and lower order coefficients. Uses
+/// BDFInfo for the actual solving.
+///
+/// # Examples
+/// ```
+/// use nalgebra::{VectorN, U1};
+/// use bacon_sci::ivp::{BDF2, BDFSolver};
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<VectorN<f64, U1>, String> {
+///     Ok(-VectorN::<f64, U1>::from_column_slice(state))
+/// }
+///
+/// fn example() -> Result<(), String> {
+///     let bdf = BDF2::new()
+///         .with_dt_max(0.1)?
+///         .with_dt_min(0.00001)?
+///         .with_tolerance(0.00001)?
+///         .with_start(0.0)?
+///         .with_end(10.0)?
+///         .with_initial_conditions(&[1.0])?
+///         .build();
+///     let path = bdf.solve_ivp(derivatives, &mut ())?;
+///     for (time, state) in &path {
+///         assert!(((-time).exp() - state.column(0)[0]).abs() < 0.001);
+///     }
+///     Ok(())
+/// }
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+pub struct BDF2<N: ComplexField, S: DimName>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U3>,
+    DefaultAllocator: Allocator<N::RealField, U3>,
+{
+    info: BDFInfo<N, S, U3>,
+}
+
+impl<N: ComplexField, S: DimName> BDF2<N, S>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U3>,
+    DefaultAllocator: Allocator<N::RealField, U3>,
+{
+    pub fn new() -> Self {
+        let mut info = BDFInfo::new();
+        info.higher_coffecients = VectorN::<N, U3>::from_iterator(
+            Self::higher_coefficients().iter().map(|&x| N::from_real(x)),
+        );
+        info.lower_coefficients = VectorN::<N, U3>::from_iterator(
+            Self::lower_coefficients().iter().map(|&x| N::from_real(x)),
+        );
+
+        BDF2 { info }
+    }
+}
+
+impl<N: ComplexField, S: DimName> Default for BDF2<N, S>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U3>,
+    DefaultAllocator: Allocator<N::RealField, U3>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<N: ComplexField, S: DimName> BDFSolver<N, S, U3> for BDF2<N, S>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U3>,
+    DefaultAllocator: Allocator<N::RealField, U3>,
+{
+    fn higher_coefficients() -> VectorN<N::RealField, U3> {
+        VectorN::<N::RealField, U3>::from_column_slice(&[
+            N::RealField::from_f64(2.0 / 3.0).unwrap(),
+            N::RealField::from_f64(-4.0 / 3.0).unwrap(),
+            N::RealField::from_f64(1.0 / 3.0).unwrap(),
+        ])
+    }
+
+    fn lower_coefficients() -> VectorN<N::RealField, U3> {
+        VectorN::<N::RealField, U3>::from_column_slice(&[
+            N::RealField::from_f64(1.0).unwrap(),
+            N::RealField::from_f64(-1.0).unwrap(),
+            N::RealField::zero(),
+        ])
+    }
+
+    fn solve_ivp<
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+    >(
+        self,
+        f: F,
+        params: &mut T,
+    ) -> super::Path<N, N::RealField, S> {
+        self.info.solve_ivp(f, params)
+    }
+
+    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_tolerance(tol)?;
+        Ok(self)
+    }
+
+    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_max(max)?;
+        Ok(self)
+    }
+
+    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_dt_min(min)?;
+        Ok(self)
+    }
+
+    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_start(t_initial)?;
+        Ok(self)
+    }
+
+    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
+        self.info = self.info.with_end(t_final)?;
+        Ok(self)
+    }
+
+    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
+        self.info = self.info.with_initial_conditions(start)?;
+        Ok(self)
+    }
+
+    fn build(mut self) -> Self {
+        self.info = self.info.build();
+        self
+    }
+}
+
+impl<N: ComplexField, S: DimName> From<BDF2<N, S>> for BDFInfo<N, S, U3>
+where
+    DefaultAllocator: Allocator<N, S>,
+    DefaultAllocator: Allocator<N, U3>,
+    DefaultAllocator: Allocator<N::RealField, U3>,
+{
+    fn from(bdf: BDF2<N, S>) -> BDFInfo<N, S, U3> {
         bdf.info
     }
 }
