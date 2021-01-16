@@ -1,6 +1,6 @@
 [package]
 name = "bacon-sci"
-version = "0.8.3"
+version = "0.8.4"
 authors = ["aftix <aftix@aftix.xyz>"]
 edition = "2018"
 license="MIT"
@@ -20,7 +20,7 @@ float-cmp="0.8"
 [dependencies]
 lazy_static="1.2"
 serde={version="1.0", optional=true}
-nalgebra="0.23"
+nalgebra="0.24"
 num-complex="0.2"
 num-traits="0.2"
 alga="0.9"
