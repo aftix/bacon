@@ -4,8 +4,6 @@
  * See repository LICENSE for information.
  */
 
-#[macro_use]
-extern crate lazy_static;
 #[allow(unused_imports)]
 extern crate num_complex;
 extern crate num_traits;
