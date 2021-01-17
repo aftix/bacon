@@ -20,6 +20,7 @@ pub mod polynomial;
 pub mod differentiate;
 pub mod integrate;
 pub mod interp;
+pub mod optimize;
 pub mod special;
 
 #[cfg(test)]

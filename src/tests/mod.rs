@@ -8,6 +8,7 @@ mod differentiate;
 mod integrate;
 mod interp;
 mod ivp;
+mod optimize;
 mod polynomial;
 mod roots;
 mod special;
