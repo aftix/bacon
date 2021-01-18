@@ -30,6 +30,10 @@ fn cosine(x: f64) -> f64 {
     x.cos()
 }
 
+fn cosine_fixed(x: f64) -> f64 {
+    x.cos() - x
+}
+
 fn poly(x: f64) -> f64 {
     (10.0 / (x + 4.0)).sqrt()
 }
@@ -193,4 +197,27 @@ fn steffensen_cos() {
 fn steffenson_poly() {
     let solution = roots::steffensen(1.2f64, poly, 0.0001, 1000).unwrap();
     assert!(approx_eq!(f64, solution, 1.3652, epsilon = 0.0001));
+}
+
+#[test]
+fn brent_exp() {
+    let solution = roots::brent((-2f64, 2f64), exp_xsq, 1e-7).unwrap();
+    assert!(approx_eq!(f64, solution, -0.703467, epsilon = 0.0000005));
+}
+
+#[test]
+fn brent_cos() {
+    let solution = roots::brent((0.0, 1.0), cosine_fixed, 1e-7).unwrap();
+    assert!(approx_eq!(f64, solution, 0.739085, epsilon = 0.000001));
+}
+
+#[test]
+fn brent_sqrt() {
+    let solution = roots::brent((1f64, 2f64), sqrt_two, 1e-7).unwrap();
+    assert!(approx_eq!(
+        f64,
+        solution,
+        f64::consts::SQRT_2,
+        epsilon = 1e-7
+    ));
 }

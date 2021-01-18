@@ -298,3 +298,109 @@ where
 
     Err("Secant: Maximum iterations exceeded".to_owned())
 }
+
+/// Use Brent's method to find the root of a function
+///
+/// The initial guesses must bracket the root. That is, the initial guesses
+/// must differ in sign.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::roots::brent;
+/// fn cubic(x: f64) -> f64 {
+///     x.powi(3)
+/// }
+/// //...
+/// fn example() {
+///   let solution = brent((0.1, -0.1), cubic, 1e-5).unwrap();
+/// }
+/// ```
+pub fn brent<N: RealField, F: FnMut(N) -> N>(
+    initial: (N, N),
+    mut f: F,
+    tol: N,
+) -> Result<N, String> {
+    if !tol.is_sign_positive() {
+        return Err("brent: tolerance must be positive".to_owned());
+    }
+
+    let mut a = initial.0;
+    let mut b = initial.1;
+    let mut f_a = f(a);
+    let mut f_b = f(b);
+
+    // Make a the maximum
+    if f_a.abs() < f_b.abs() {
+        let tmp = a;
+        a = b;
+        b = tmp;
+        let tmp = f_a;
+        f_a = f_b;
+        f_b = tmp;
+    }
+
+    if !(f_a * f_b).is_sign_negative() {
+        println!("{} {}", f_a, f_b);
+        return Err("brent: initial guesses do not bracket root".to_owned());
+    }
+
+    let two = N::from_i32(2).unwrap();
+    let three = N::from_i32(3).unwrap();
+    let four = N::from_i32(4).unwrap();
+
+    let mut c = a;
+    let mut f_c = f_a;
+    let mut s = b - f_b * (b - a) / (f_b - f_a);
+    let mut f_s = f(s);
+    let mut mflag = true;
+    let mut d = c;
+
+    while !(f_b.abs() < tol || f_s.abs() < tol || (a - b).abs() < tol) {
+        if (f_a - f_c).abs() < tol && (f_b - f_c).abs() < tol {
+            s = (a * f_b * f_c) / ((f_a - f_b) * (f_a - f_c))
+                + (b * f_a * f_c) / ((f_b - f_a) * (f_b - f_c))
+                + (c * f_a * f_b) / ((f_c - f_a) * (f_c - f_b));
+        } else {
+            s = b - f_b * (b - a) / (f_b - f_a);
+        }
+
+        if !(s >= (three * a + b) / four && s <= b)
+            || (mflag && (s - b).abs() >= (b - c) / two)
+            || (!mflag && (s - b).abs() >= (c - d).abs() / two)
+            || (mflag && (b - c).abs() < tol)
+            || (!mflag && (c - d).abs() < tol)
+        {
+            s = (a + b) / two;
+            mflag = true;
+        } else {
+            mflag = false;
+        }
+
+        f_s = f(s);
+        d = c;
+        c = b;
+        f_c = f_b;
+        if (f_a * f_s).is_sign_negative() {
+            b = s;
+            f_b = f_s;
+        } else {
+            a = s;
+            f_a = f_s;
+        }
+
+        if f_a.abs() < f_b.abs() {
+            let tmp = a;
+            a = b;
+            b = tmp;
+            let tmp = f_a;
+            f_a = f_b;
+            f_b = tmp;
+        }
+    }
+
+    if f_s.abs() < tol {
+        Ok(s)
+    } else {
+        Ok(b)
+    }
+}

@@ -7,7 +7,6 @@ triple integrals
 Linear algebra algorithms?
 Euler-cromer method
 PDEs
-method of false position
 better README
 blogpost
 statistics distributions
@@ -22,3 +21,8 @@ Catalan Numbers
 Halley's method
 Multidimensional Newton's method
 Least-squares regression
+Levenberg-Marquardt Algorithm
+Brent's Algorithm
+Trust Reflective ALgorithm
+dogleg algorithm
+ITP method
