@@ -301,8 +301,8 @@ where
 
 /// Use Brent's method to find the root of a function
 ///
-/// The initial guesses must bracket the root. That is, the initial guesses
-/// must differ in sign.
+/// The initial guesses must bracket the root. That is, the function evaluations of
+/// the initial guesses must differ in sign.
 ///
 /// # Examples
 /// ```
@@ -340,7 +340,6 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
     }
 
     if !(f_a * f_b).is_sign_negative() {
-        println!("{} {}", f_a, f_b);
         return Err("brent: initial guesses do not bracket root".to_owned());
     }
 
@@ -403,4 +402,102 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
     } else {
         Ok(b)
     }
+}
+
+/// Find the root of an equation using the ITP method.
+///
+/// The initial guess must bracket the root, that is the
+/// function evaluations must differ in sign between the
+/// two initial guesses. k_1 is a parameter in (0, infty).
+/// k_2 is a paramater in (1, 1 + golden_ratio). n_0 is a parameter
+/// in [0, infty). This method gives the worst case performance of the
+/// bisection method (which has the best worst case performance) with
+/// better average convergance.
+///
+/// # Examples
+/// ```
+/// use bacon_sci::roots::itp;
+/// fn cubic(x: f64) -> f64 {
+///     x.powi(3)
+/// }
+/// //...
+/// fn example() {
+///   let solution = itp((0.1, -0.1), cubic, 0.1, 2.0, 0.99, 1e-5).unwrap();
+/// }
+/// ```
+pub fn itp<N: RealField, F: FnMut(N) -> N>(
+    initial: (N, N),
+    mut f: F,
+    k_1: N,
+    k_2: N,
+    n_0: N,
+    tol: N,
+) -> Result<N, String> {
+    if !tol.is_sign_positive() {
+        return Err("itp: tolerance must be positive".to_owned());
+    }
+
+    if !k_1.is_sign_positive() {
+        return Err("itp: k_1 must be positive".to_owned());
+    }
+
+    if k_2 <= N::one() || k_2 >= (N::one() + N::from_f64(0.5 * (1.0 + 5.0_f64.sqrt())).unwrap()) {
+        return Err("itp: k_2 must be in (1, 1 + golden_ratio)".to_owned());
+    }
+
+    let mut a = initial.0;
+    let mut b = initial.1;
+    let mut f_a = f(a);
+    let mut f_b = f(b);
+
+    if !(f_a * f_b).is_sign_negative() {
+        return Err("itp: initial guesses must bracket root".to_owned());
+    }
+
+    if f_a.is_sign_positive() {
+        let tmp = a;
+        a = b;
+        b = tmp;
+        let tmp = f_a;
+        f_a = f_b;
+        f_b = tmp;
+    }
+
+    let two = N::from_i32(2).unwrap();
+
+    let n_half = ((b - a).abs() / (two * tol)).log2().ceil();
+    let n_max = n_half + n_0;
+    let mut j = 0;
+
+    while (b - a).abs() > two * tol {
+        let x_half = (a + b) / two;
+        let r = tol * two.powf(n_max + n_0 - N::from_i32(j).unwrap()) - (b - a) / two;
+        let x_f = (f_b * a - f_a * b) / (f_b - f_a);
+        let sigma = (x_half - x_f) / (x_half - x_f).abs();
+        let delta = k_1 * (b - a).powf(k_2);
+        let x_t = if delta <= (x_half - x_f).abs() {
+            x_f + sigma * delta
+        } else {
+            x_half
+        };
+        let x_itp = if (x_t - x_half).abs() <= r {
+            x_t
+        } else {
+            x_half - sigma * r
+        };
+        let f_itp = f(x_itp);
+        if f_itp.is_sign_positive() {
+            b = x_itp;
+            f_b = f_itp;
+        } else if f_itp.is_sign_negative() {
+            a = x_itp;
+            f_a = f_itp;
+        } else {
+            a = x_itp;
+            b = x_itp;
+        }
+        j += 1;
+    }
+
+    Ok((a + b) / two)
 }

@@ -221,3 +221,27 @@ fn brent_sqrt() {
         epsilon = 1e-7
     ));
 }
+
+#[test]
+fn itp_exp() {
+    let solution = roots::itp((2f64, -2f64), exp_xsq, 0.1, 2f64, 0.99, 1e-7).unwrap();
+    assert!(approx_eq!(f64, solution, -0.703467, epsilon = 0.0000005));
+}
+
+#[test]
+fn itp_cos() {
+    let solution = roots::itp((0.1, 1.0), cosine_fixed, 0.1, 2.0, 0.99, 1e-7).unwrap();
+    println!("{}", solution);
+    assert!(approx_eq!(f64, solution, 0.739085, epsilon = 0.000001));
+}
+
+#[test]
+fn itp_sqrt() {
+    let solution = roots::itp((1f64, 2f64), sqrt_two, 0.1, 2.0, 0.99, 1e-7).unwrap();
+    assert!(approx_eq!(
+        f64,
+        solution,
+        f64::consts::SQRT_2,
+        epsilon = 1e-7
+    ));
+}
