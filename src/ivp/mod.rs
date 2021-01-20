@@ -4,8 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use alga::general::ComplexField;
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U6};
+use nalgebra::{allocator::Allocator, ComplexField, DefaultAllocator, DimName, VectorN, U6};
 use num_traits::Zero;
 
 mod adams;

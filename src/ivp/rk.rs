@@ -5,8 +5,10 @@
  */
 
 use super::{IVPSolver, IVPStatus};
-use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, MatrixMN, VectorN, U4, U6};
+use nalgebra::{
+    allocator::Allocator, ComplexField, DefaultAllocator, DimName, MatrixMN, RealField, VectorN,
+    U4, U6,
+};
 use num_traits::{FromPrimitive, Zero};
 
 /// This trait allows a struct to be used in the Runge-Kutta solver.

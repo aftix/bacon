@@ -5,8 +5,9 @@
  */
 
 use super::{IVPSolver, IVPStatus};
-use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN, U3, U5};
+use nalgebra::{
+    allocator::Allocator, ComplexField, DefaultAllocator, DimName, RealField, VectorN, U3, U5,
+};
 use num_traits::{FromPrimitive, Zero};
 use std::collections::VecDeque;
 

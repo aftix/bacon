@@ -4,7 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use alga::general::ComplexField;
+use nalgebra::ComplexField;
 
 /// Numerically find the derivative of a function at a point.
 ///

@@ -4,7 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use alga::general::{ComplexField, RealField};
+use nalgebra::{ComplexField, RealField};
 use num_traits::{FromPrimitive, One, Zero};
 use std::f64;
 

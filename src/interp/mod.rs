@@ -5,7 +5,7 @@
  */
 
 use super::polynomial::Polynomial;
-use alga::general::ComplexField;
+use nalgebra::ComplexField;
 
 mod spline;
 pub use spline::*;

@@ -21,9 +21,8 @@ rand="0.8"
 [dependencies]
 serde={version="1.0", optional=true}
 nalgebra="0.24"
-num-complex="0.2"
+num-complex="0.3"
 num-traits="0.2"
-alga="0.9"
 phf = "0.8"
 
 [build-dependencies]

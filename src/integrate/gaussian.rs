@@ -1,4 +1,4 @@
-use alga::general::{ComplexField, RealField};
+use nalgebra::{ComplexField, RealField};
 use num_traits::{FromPrimitive, One, Zero};
 
 use super::tables::{

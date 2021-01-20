@@ -1,5 +1,5 @@
 use crate::roots::newton_polynomial;
-use alga::general::*;
+use nalgebra::{ComplexField, RealField};
 use num_complex::Complex;
 use num_traits::{FromPrimitive, One, Zero};
 use std::collections::VecDeque;
@@ -491,12 +491,6 @@ impl<N: ComplexField> Default for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> AbstractMagma<Additive> for Polynomial<N> {
-    fn operate(&self, rhs: &Self) -> Self {
-        self + rhs
-    }
-}
-
 impl<N: ComplexField> Zero for Polynomial<N> {
     fn zero() -> Polynomial<N> {
         Polynomial::new()
@@ -511,8 +505,6 @@ impl<N: ComplexField> Zero for Polynomial<N> {
         true
     }
 }
-
-// TODO: Add other alga traits
 
 // Operator overloading
 

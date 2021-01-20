@@ -5,7 +5,7 @@
  */
 
 use crate::polynomial::Polynomial;
-use alga::general::{ComplexField, RealField};
+use nalgebra::{ComplexField, RealField};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]

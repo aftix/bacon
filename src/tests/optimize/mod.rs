@@ -1,5 +1,24 @@
-use crate::optimize::linear_fit;
+use crate::optimize::{curve_fit, linear_fit};
+use nalgebra::{VectorN, U1};
 use rand::prelude::*;
+
+fn model(x: f64, params: &VectorN<f64, U1>) -> f64 {
+    x.powi(2) + params[0]
+}
+
+#[test]
+fn test_curve_fit() {
+    let xs: Vec<f64> = (-50..=50).map(|x| x as f64 / 50.0).collect();
+    let ys: Vec<f64> = xs
+        .iter()
+        .map(|&x| model(x, &VectorN::<f64, U1>::from_column_slice(&[2.0])))
+        .collect();
+
+    let solution = curve_fit(model, &xs, &ys, &[1.0], 1e-7, 0.1, 2.0).unwrap();
+    assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
+    let solution = curve_fit(model, &xs, &ys, &[3.0], 1e-7, 0.1, 2.0).unwrap();
+    assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
+}
 
 #[test]
 fn test_linear_fit() {

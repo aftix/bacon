@@ -1,5 +1,5 @@
 use crate::polynomial::Polynomial;
-use alga::general::ComplexField;
+use nalgebra::ComplexField;
 use num_complex::Complex;
 use num_traits::{FromPrimitive, Zero};
 

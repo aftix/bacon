@@ -1,6 +1,6 @@
 use crate::polynomial::Polynomial;
 use crate::roots::newton_polynomial;
-use alga::general::ComplexField;
+use nalgebra::ComplexField;
 use num_traits::FromPrimitive;
 use std::iter::FromIterator;
 

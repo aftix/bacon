@@ -4,8 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use alga::general::{ComplexField, RealField};
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, VectorN};
+use nalgebra::{allocator::Allocator, ComplexField, DefaultAllocator, DimName, RealField, VectorN};
 
 mod polynomial;
 pub use polynomial::*;
