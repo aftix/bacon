@@ -5,7 +5,7 @@
  */
 
 use crate::roots;
-use nalgebra::{VectorN, U1, U2};
+use nalgebra::{MatrixN, VectorN, U1, U2};
 use std::f64;
 
 mod polynomial;
@@ -47,11 +47,12 @@ fn exp_newton(x: &[f64]) -> VectorN<f64, U2> {
     )
 }
 
-fn exp_newton_deriv(x: &[f64]) -> VectorN<f64, U2> {
-    VectorN::<f64, U2>::from_iterator(
-        x.iter()
-            .enumerate()
-            .map(|(i, x)| x.exp() - ((i + 2) as f64) * x.powi(i as i32 + 1)),
+fn exp_newton_deriv(x: &[f64]) -> MatrixN<f64, U2> {
+    MatrixN::<f64, U2>::new(
+        x[0].exp() - 2.0 * x[0],
+        0.0,
+        0.0,
+        x[1].exp() - 3.0 * x[1].powi(2),
     )
 }
 

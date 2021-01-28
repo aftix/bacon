@@ -145,15 +145,7 @@ where
         let lu = multiplied.clone().lu();
         let solved = lu.solve_mut(&mut b);
         if !solved {
-            let lu = multiplied.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b);
-            if !solved {
-                let qr = multiplied.qr();
-                let solved = qr.solve_mut(&mut b);
-                if !solved {
-                    return Err("curve_fit: unable to solve linear equation".to_owned());
-                }
-            }
+            return Err("curve_fit: unable to solve linear equation".to_owned());
         }
         params += &b;
         evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
@@ -185,19 +177,10 @@ where
             multiplied[(i, i)] *= N::one() + N::from_real(damping);
         }
         // Solve equation with LU w/ partial pivoting first
-        // Then try LU w/ Full pivoting, QR
         let lu = multiplied.clone().lu();
         let solved = lu.solve_mut(&mut b);
         if !solved {
-            let lu = multiplied.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b);
-            if !solved {
-                let qr = multiplied.qr();
-                let solved = qr.solve_mut(&mut b);
-                if !solved {
-                    return Err("curve_fit: unable to solve linear equation".to_owned());
-                }
-            }
+            return Err("curve_fit: unable to solve linear equation".to_owned());
         }
         let new_params = &params + &b;
 

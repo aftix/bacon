@@ -4,7 +4,11 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{allocator::Allocator, ComplexField, DefaultAllocator, DimName, RealField, VectorN};
+use nalgebra::{
+    allocator::Allocator,
+    dimension::{DimMin, DimMinimum},
+    ComplexField, DefaultAllocator, DimName, MatrixN, RealField, VectorN,
+};
 
 mod polynomial;
 pub use polynomial::*;
@@ -163,36 +167,38 @@ pub fn steffensen<N: RealField + From<f64> + Copy>(
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::{VectorN, U1, MatrixN};
 /// use bacon_sci::roots::newton;
 /// fn cubic(x: &[f64]) -> VectorN<f64, U1> {
 ///   VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.powi(3)))
 /// }
 ///
-/// fn cubic_deriv(x: &[f64]) -> VectorN<f64, U1> {
-///  VectorN::<f64, U1>::from_iterator(x.iter().map(|x| 3.0*x.powi(2)))
+/// fn cubic_deriv(x: &[f64]) -> MatrixN<f64, U1> {
+///  MatrixN::<f64, U1>::from_iterator(x.iter().map(|x| 3.0*x.powi(2)))
 /// }
 /// //...
 /// fn example() {
 ///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton<
-    N: ComplexField,
-    S: DimName,
-    F: FnMut(&[N]) -> VectorN<N, S>,
-    G: FnMut(&[N]) -> VectorN<N, S>,
->(
+pub fn newton<N, S, F, G>(
     initial: &[N],
     mut f: F,
-    mut f_deriv: G,
+    mut jac: G,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
 ) -> Result<VectorN<N, S>, String>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
+    S: DimName + DimMin<S, Output = S>,
+    F: FnMut(&[N]) -> VectorN<N, S>,
+    G: FnMut(&[N]) -> MatrixN<N, S>,
+    DefaultAllocator: Allocator<N, S>
+        + Allocator<N, S, S>
+        + Allocator<(usize, usize), DimMinimum<S, S>>
+        + Allocator<(usize, usize), S>,
 {
-    let mut guess = VectorN::from_column_slice(initial);
+    let mut guess = VectorN::<N, S>::from_column_slice(initial);
     let mut norm = guess.dot(&guess).sqrt().abs();
     let mut n = 0;
 
@@ -201,16 +207,24 @@ where
     }
 
     while n < n_max {
-        let f_val = f(guess.as_slice());
-        let f_deriv_val = f_deriv(guess.as_slice());
-        let adjustment = VectorN::from_iterator(
+        let f_val = -f(guess.as_slice());
+        let f_deriv_val = jac(guess.as_slice());
+        // TODO allow for non-independent equations
+        /*let adjustment = VectorN:::from_iterator(
             f_val
                 .column(0)
                 .iter()
-                .zip(f_deriv_val.column(0).iter())
-                .map(|(f, f_d)| *f / *f_d),
-        );
-        let new_guess = &guess - adjustment;
+                .enumerate()
+                .map(|(ind, f)| *f / f_deriv_val[(ind, ind)]),
+
+        );*/
+        let lu = f_deriv_val.clone().lu();
+        let solved = lu.solve(&f_val);
+        if let None = solved {
+            return Err("newton: failed to solve linear equation".to_owned());
+        }
+        let adjustment = solved.unwrap();
+        let new_guess = &guess + &adjustment;
         let new_norm = new_guess.dot(&new_guess).sqrt().abs();
         if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
             return Ok(new_guess);

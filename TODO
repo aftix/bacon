@@ -19,8 +19,11 @@ Bernoulli numbers
 Euler numbers
 Catalan Numbers
 Halley's method
-Multidimensional Newton's method
 Least-squares regression
 Levenberg-Marquardt Algorithm
 Trust Reflective ALgorithm
 dogleg algorithm
+multivariate secant method
+more newton test
+change to where clauses
+exact jacobian BDF
