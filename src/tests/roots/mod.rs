@@ -5,7 +5,7 @@
  */
 
 use crate::roots;
-use nalgebra::{MatrixN, VectorN, U1, U2};
+use nalgebra::{MatrixN, VectorN, U1, U2, U3};
 use std::f64;
 
 mod polynomial;
@@ -36,6 +36,28 @@ fn cosine_fixed(x: f64) -> f64 {
 
 fn poly(x: f64) -> f64 {
     (10.0 / (x + 4.0)).sqrt()
+}
+
+fn newton_complex(x: &[f64]) -> VectorN<f64, U3> {
+    VectorN::<f64, U3>::from_column_slice(&[
+        3.0 * x[0] - (x[1] * x[2]).cos() - 0.5,
+        x[0].powi(2) - 81.0 * (x[1] + 0.1).powi(2) + x[2].sin() + 1.06,
+        (-x[0] * x[1]).exp() + 20.0 * x[2] + (f64::consts::PI * 10.0 - 3.0) / 3.0,
+    ])
+}
+
+fn jac_complex(x: &[f64]) -> MatrixN<f64, U3> {
+    MatrixN::<f64, U3>::new(
+        3.0,
+        x[2] * (x[1] * x[2]).sin(),
+        x[1] * (x[1] * x[2]).sin(),
+        2.0 * x[0],
+        -162.0 * (x[1] + 0.1),
+        x[2].cos(),
+        -x[1] * (-x[0] * x[1]).exp(),
+        -x[0] * (-x[0] * x[1]).exp(),
+        20.0,
+    )
 }
 
 // Solve x^n = exp(x) where n is 2+index (since x = exp(x) has no solution)
@@ -130,6 +152,15 @@ fn newton_exp() {
         4.5364,
         epsilon = 0.00001
     ));
+}
+
+#[test]
+fn test_newton() {
+    let start = [0.1, 0.1, -0.1];
+    let solution = roots::newton(&start, newton_complex, jac_complex, 1e-5, 1000).unwrap();
+    assert!(approx_eq!(f64, solution[0], 0.5, epsilon = 1e-5));
+    assert!(approx_eq!(f64, solution[1], 0.0, epsilon = 1e-5));
+    assert!(approx_eq!(f64, solution[2], -0.52359877, epsilon = 1e-5));
 }
 
 #[test]
