@@ -164,11 +164,19 @@ fn test_newton() {
 }
 
 #[test]
+fn test_secant() {
+    let start = [0.1, 0.1, -0.1];
+    let solution = roots::secant(&start, newton_complex, 0.1, 1e-5, 1000).unwrap();
+    assert!(approx_eq!(f64, solution[0], 0.5, epsilon = 1e-5));
+    assert!(approx_eq!(f64, solution[1], 0.0, epsilon = 1e-5));
+    assert!(approx_eq!(f64, solution[2], -0.52359877, epsilon = 1e-5));
+}
+
+#[test]
 fn secant_exp() {
-    let start_1 = [0.7, 1.8];
-    let start_2 = [0.8, 1.9];
-    let tol = 0.0001;
-    let solution = roots::secant((&start_1, &start_2), exp_newton, tol, 1000).unwrap();
+    let start = [0.7, 1.8];
+    let tol = 1e-6;
+    let solution = roots::secant(&start, exp_newton, 0.1, tol, 1000).unwrap();
     assert!(approx_eq!(
         f64,
         *solution.get(0).unwrap(),
@@ -182,9 +190,8 @@ fn secant_exp() {
         epsilon = 0.00001
     ));
 
-    let start_1 = [0.7, 4.4];
-    let start_2 = [0.8, 4.6];
-    let solution = roots::secant((&start_1, &start_2), exp_newton, tol, 1000).unwrap();
+    let start = [0.7, 4.7];
+    let solution = roots::secant(&start, exp_newton, 0.1, tol, 1000).unwrap();
     assert!(approx_eq!(
         f64,
         *solution.get(0).unwrap(),
@@ -201,10 +208,9 @@ fn secant_exp() {
 
 #[test]
 fn secant_cos() {
-    let start_1 = [0.6];
-    let start_2 = [1.0];
+    let start = [0.6];
     let tol = 0.0001;
-    let solution = roots::secant((&start_1, &start_2), cos_secant, tol, 1000).unwrap();
+    let solution = roots::secant(&start, cos_secant, 0.1, tol, 1000).unwrap();
     assert!(approx_eq!(
         f64,
         *solution.get(0).unwrap(),

@@ -7,8 +7,9 @@
 use nalgebra::{
     allocator::Allocator,
     dimension::{DimMin, DimMinimum},
-    ComplexField, DefaultAllocator, DimName, MatrixN, RealField, VectorN,
+    ComplexField, DefaultAllocator, DimName, MatrixN, RealField, VectorN, U1,
 };
+use num_traits::Zero;
 
 mod polynomial;
 pub use polynomial::*;
@@ -209,15 +210,6 @@ where
     while n < n_max {
         let f_val = -f(guess.as_slice());
         let f_deriv_val = jac(guess.as_slice());
-        // TODO allow for non-independent equations
-        /*let adjustment = VectorN:::from_iterator(
-            f_val
-                .column(0)
-                .iter()
-                .enumerate()
-                .map(|(ind, f)| *f / f_deriv_val[(ind, ind)]),
-
-        );*/
         let lu = f_deriv_val.clone().lu();
         let solved = lu.solve(&f_val);
         if let None = solved {
@@ -238,10 +230,41 @@ where
     Err("Newton: Maximum iterations exceeded".to_owned())
 }
 
+fn jac_finite_diff<N, S, F>(
+    mut f: F,
+    x: &mut VectorN<N, S>,
+    h: <N as ComplexField>::RealField,
+) -> MatrixN<N, S>
+where
+    N: ComplexField,
+    S: DimName,
+    F: FnMut(&[N]) -> VectorN<N, S>,
+    DefaultAllocator: Allocator<N, S> + Allocator<N, S, S>,
+{
+    let mut mat = MatrixN::<N, S>::zero();
+    let h = N::from_real(h);
+    let denom = N::one() / (N::from_i32(2).unwrap() * h);
+
+    for col in 0..mat.row(0).len() {
+        x[col] += h;
+        let above = f(x.as_slice());
+        x[col] -= h;
+        x[col] -= h;
+        let below = f(x.as_slice());
+        x[col] += h;
+        let jac_col = (&above + &below) * denom;
+        for row in 0..mat.column(0).len() {
+            mat[(row, col)] = jac_col[row];
+        }
+    }
+
+    mat
+}
+
 /// Use secant method to find a root of a vector function.
 ///
-/// Using a vector function and its derivative, find a root based on two initial guesses
-/// using secant method.
+/// Using a vector function and its derivative, find a root based on an initial guess
+/// and finite element differences using Broyden's method.
 ///
 /// # Returns
 /// `Ok(vec)` on success, where `vec` is a vector input for which the function is
@@ -266,46 +289,54 @@ where
 /// }
 /// //...
 /// fn example() {
-///   let solution = secant((&[0.1], &[-0.1]), cubic, 0.001, 1000).unwrap();
+///   let solution = secant(&[0.1], cubic, 0.1, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn secant<N: ComplexField, S: DimName, F: FnMut(&[N]) -> VectorN<N, S>>(
-    initial: (&[N], &[N]),
+pub fn secant<N, S, F>(
+    initial: &[N],
     mut f: F,
+    h: <N as ComplexField>::RealField,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
 ) -> Result<VectorN<N, S>, String>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
+    S: DimName + DimMin<S, Output = S>,
+    F: FnMut(&[N]) -> VectorN<N, S>,
+    DefaultAllocator:
+        Allocator<N, S> + Allocator<N, S, S> + Allocator<(usize, usize), S> + Allocator<N, U1, S>,
 {
-    let mut n = 0;
+    let mut n = 2;
 
-    let mut left = VectorN::from_column_slice(initial.0);
-    let mut right = VectorN::from_column_slice(initial.1);
+    let mut x = VectorN::<N, S>::from_column_slice(initial);
+    let mut v = f(x.as_slice());
 
-    let mut left_val = f(initial.0);
-    let mut right_val = f(initial.1);
+    let jac = jac_finite_diff(&mut f, &mut x, h);
+    let lu = jac.lu();
+    let try_inv = lu.try_inverse();
+    let mut jac_inv = if let Some(inv) = try_inv {
+        inv
+    } else {
+        return Err("Secant: Can not inverse finite element difference jacobian".to_owned());
+    };
 
-    let mut norm = right.dot(&right).sqrt().abs();
-    if norm <= tol {
-        return Ok(right);
-    }
+    let mut s = -&jac_inv * &v;
+    x += &s;
 
-    while n <= n_max {
-        let adjustment = VectorN::from_iterator(right_val.iter().enumerate().map(|(i, q)| {
-            *q * (*right.get(i).unwrap() - *left.get(i).unwrap()) / (*q - *left_val.get(i).unwrap())
-        }));
-        let new_guess = &right - adjustment;
-        let new_norm = new_guess.dot(&new_guess).sqrt().abs();
-        if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
-            return Ok(new_guess);
+    while n < n_max {
+        let w = v;
+        v = f(x.as_slice());
+        let y = &v - &w;
+        let z = -&jac_inv * &y;
+        let s_transpose = s.transpose();
+        let p = (-&s_transpose * &z)[(0, 0)];
+        let u = &s_transpose * &jac_inv;
+        jac_inv += (&s + &z) * &u / p;
+        s = -&jac_inv * &v;
+        x += &s;
+        if s.norm().abs() <= tol {
+            return Ok(x);
         }
-
-        norm = new_norm;
-        left_val = right_val;
-        left = right;
-        right = new_guess;
-        right_val = f(right.as_slice());
         n += 1;
     }
 

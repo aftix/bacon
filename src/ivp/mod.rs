@@ -4,7 +4,10 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{allocator::Allocator, ComplexField, DefaultAllocator, DimName, VectorN, U6};
+use nalgebra::{
+    allocator::Allocator, dimension::DimMin, ComplexField, DefaultAllocator, DimName, VectorN, U1,
+    U6, U7,
+};
 use num_traits::Zero;
 
 mod adams;
@@ -282,12 +285,7 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub fn solve_ivp<
-    N: ComplexField,
-    S: DimName,
-    T: Clone,
-    F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
->(
+pub fn solve_ivp<N, S, T, F>(
     (start, end): (N::RealField, N::RealField),
     (dt_max, dt_min): (N::RealField, N::RealField),
     y_0: &[N],
@@ -296,12 +294,20 @@ pub fn solve_ivp<
     params: &mut T,
 ) -> Path<N, N::RealField, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, U6>,
-    DefaultAllocator: Allocator<N, S, U6>,
-    DefaultAllocator: Allocator<N, U6, U6>,
-    DefaultAllocator: Allocator<N::RealField, U6>,
-    DefaultAllocator: Allocator<N::RealField, U6, U6>,
+    N: ComplexField,
+    S: DimName + DimMin<S, Output = S>,
+    T: Clone,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+    DefaultAllocator: Allocator<N, S>
+        + Allocator<N, U6>
+        + Allocator<N, S, U6>
+        + Allocator<N, U6, U6>
+        + Allocator<N::RealField, U6>
+        + Allocator<N::RealField, U6, U6>
+        + Allocator<N, U7>
+        + Allocator<N, S, S>
+        + Allocator<N, U1, S>
+        + Allocator<(usize, usize), S>,
 {
     let solver = Adams::new()
         .with_start(start)?
