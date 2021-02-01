@@ -4,7 +4,6 @@
  * See repository LICENSE for information.
  */
 
-#[allow(unused_imports)]
 extern crate num_complex;
 extern crate num_traits;
 

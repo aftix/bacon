@@ -154,6 +154,7 @@ fn newton_exp() {
     ));
 }
 
+#[allow(clippy::approx_constant)]
 #[test]
 fn test_newton() {
     let start = [0.1, 0.1, -0.1];
@@ -163,6 +164,7 @@ fn test_newton() {
     assert!(approx_eq!(f64, solution[2], -0.52359877, epsilon = 1e-5));
 }
 
+#[allow(clippy::approx_constant)]
 #[test]
 fn test_secant() {
     let start = [0.1, 0.1, -0.1];
