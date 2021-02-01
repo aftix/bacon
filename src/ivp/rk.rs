@@ -390,6 +390,7 @@ where
     DefaultAllocator: Allocator<N::RealField, U6>,
     DefaultAllocator: Allocator<N::RealField, U6, U6>,
 {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut info: RKInfo<N, S, U6> = RKInfo::new();
         info.a_coefficients = VectorN::<N, U6>::from_iterator(
@@ -622,6 +623,7 @@ where
     DefaultAllocator: Allocator<N::RealField, U4>,
     DefaultAllocator: Allocator<N::RealField, U4, U4>,
 {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut info: RKInfo<N, S, U4> = RKInfo::new();
         info.a_coefficients = VectorN::<N, U4>::from_iterator(

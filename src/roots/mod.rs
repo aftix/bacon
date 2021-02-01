@@ -211,20 +211,20 @@ where
         let f_val = -f(guess.as_slice());
         let f_deriv_val = jac(guess.as_slice());
         let lu = f_deriv_val.clone().lu();
-        let solved = lu.solve(&f_val);
-        if let None = solved {
-            return Err("newton: failed to solve linear equation".to_owned());
-        }
-        let adjustment = solved.unwrap();
-        let new_guess = &guess + &adjustment;
-        let new_norm = new_guess.dot(&new_guess).sqrt().abs();
-        if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
-            return Ok(new_guess);
-        }
+        match lu.solve(&f_val) {
+            None => return Err("newton: failed to solve linear equation".to_owned()),
+            Some(adjustment) => {
+                let new_guess = &guess + &adjustment;
+                let new_norm = new_guess.dot(&new_guess).sqrt().abs();
+                if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
+                    return Ok(new_guess);
+                }
 
-        norm = new_norm;
-        guess = new_guess;
-        n += 1;
+                norm = new_norm;
+                guess = new_guess;
+                n += 1;
+            }
+        }
     }
 
     Err("Newton: Maximum iterations exceeded".to_owned())
@@ -375,12 +375,8 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
 
     // Make a the maximum
     if f_a.abs() < f_b.abs() {
-        let tmp = a;
-        a = b;
-        b = tmp;
-        let tmp = f_a;
-        f_a = f_b;
-        f_b = tmp;
+        std::mem::swap(&mut a, &mut b);
+        std::mem::swap(&mut f_a, &mut f_b);
     }
 
     if !(f_a * f_b).is_sign_negative() {
@@ -432,12 +428,8 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
         }
 
         if f_a.abs() < f_b.abs() {
-            let tmp = a;
-            a = b;
-            b = tmp;
-            let tmp = f_a;
-            f_a = f_b;
-            f_b = tmp;
+            std::mem::swap(&mut a, &mut b);
+            std::mem::swap(&mut f_a, &mut f_b);
         }
     }
 
@@ -499,12 +491,8 @@ pub fn itp<N: RealField, F: FnMut(N) -> N>(
     }
 
     if f_a.is_sign_positive() {
-        let tmp = a;
-        a = b;
-        b = tmp;
-        let tmp = f_a;
-        f_a = f_b;
-        f_b = tmp;
+        std::mem::swap(&mut a, &mut b);
+        std::mem::swap(&mut f_a, &mut f_b);
     }
 
     let two = N::from_i32(2).unwrap();

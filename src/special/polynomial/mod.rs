@@ -68,13 +68,17 @@ pub fn legendre_zeros<N: ComplexField>(
     }
 
     let poly: Polynomial<N> = legendre(n, poly_tol)?;
-    Ok(Vec::from_iter(poly.roots(tol, n_max)?.iter().map(|c| {
-        if c.re.abs() < tol {
-            N::zero()
-        } else {
-            N::from_real(c.re)
-        }
-    })))
+    Ok(poly
+        .roots(tol, n_max)?
+        .iter()
+        .map(|c| {
+            if c.re.abs() < tol {
+                N::zero()
+            } else {
+                N::from_real(c.re)
+            }
+        })
+        .collect())
 }
 
 /// Get the nth hermite polynomial.
@@ -182,6 +186,7 @@ fn choose<N: ComplexField>(n: u32, k: u32) -> N {
     acc
 }
 
+#[allow(clippy::from_iter_instead_of_collect)]
 /// Get the nth (positive) laguerre polynomial.
 ///
 /// Gets the nth (positive) laguerre polynomial over a specified field. This is
@@ -228,13 +233,17 @@ pub fn laguerre_zeros<N: ComplexField>(
 
     let poly: Polynomial<N> = laguerre(n, poly_tol)?;
 
-    Ok(Vec::from_iter(poly.roots(tol, n_max)?.iter().map(|c| {
-        if c.re.abs() < tol {
-            N::zero()
-        } else {
-            N::from_real(c.re)
-        }
-    })))
+    Ok(poly
+        .roots(tol, n_max)?
+        .iter()
+        .map(|c| {
+            if c.re.abs() < tol {
+                N::zero()
+            } else {
+                N::from_real(c.re)
+            }
+        })
+        .collect())
 }
 
 /// Get the nth chebyshev polynomial.

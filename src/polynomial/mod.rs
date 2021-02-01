@@ -44,7 +44,7 @@ impl<N: ComplexField> Polynomial<N> {
     pub fn with_capacity(capacity: usize) -> Self {
         let mut coefficients = Vec::with_capacity(capacity);
         coefficients.push(N::zero());
-        Polynomial::from_iter(coefficients.iter().copied())
+        coefficients.iter().copied().collect()
     }
 
     /// Create a polynomial from a slice, with the first element of the slice being the highest power
@@ -56,7 +56,7 @@ impl<N: ComplexField> Polynomial<N> {
             };
         }
         Polynomial {
-            coefficients: Vec::from_iter(data.iter().rev().copied()),
+            coefficients: data.iter().rev().copied().collect(),
             tolerance: N::RealField::from_f64(1e-10).unwrap(),
         }
     }
@@ -204,6 +204,7 @@ impl<N: ComplexField> Polynomial<N> {
         poly_anti.evaluate(upper) - poly_anti.evaluate(lower)
     }
 
+    #[allow(clippy::from_iter_instead_of_collect)]
     /// Divide this polynomial by another, getting a quotient and remainder, using tol to check for 0
     pub fn divide(&self, divisor: &Polynomial<N>) -> Result<(Self, Self), String> {
         if divisor.coefficients.len() == 1
@@ -222,7 +223,11 @@ impl<N: ComplexField> Polynomial<N> {
         if divisor.coefficients.len() == 1 {
             let idivisor = N::from_f64(1.0).unwrap() / divisor.coefficients[0];
             return Ok((
-                Polynomial::from_iter(remainder.coefficients.iter().map(|c| *c * idivisor)),
+                remainder
+                    .coefficients
+                    .iter()
+                    .map(|c| *c * idivisor)
+                    .collect(),
                 Polynomial::new(),
             ));
         }
@@ -243,12 +248,11 @@ impl<N: ComplexField> Polynomial<N> {
             // Get the amount to shift divisor by
             let padding = temp.coefficients.len() - 1;
             // Multiply every coefficient in divisor by temp's coefficient
-            temp = Polynomial::from_iter(
-                divisor
-                    .coefficients
-                    .iter()
-                    .map(|c| *c * *temp.coefficients.last().unwrap()),
-            );
+            temp = divisor
+                .coefficients
+                .iter()
+                .map(|c| *c * *temp.coefficients.last().unwrap())
+                .collect();
             // Shift the coefficients to multiply by the right power of x
             for _ in 0..padding {
                 temp.coefficients.insert(0, N::zero());
@@ -953,7 +957,7 @@ impl<N: ComplexField> ops::Neg for &Polynomial<N> {
 
     fn neg(self) -> Polynomial<N> {
         Polynomial {
-            coefficients: Vec::from_iter(self.coefficients.iter().map(|c| -*c)),
+            coefficients: self.coefficients.iter().map(|c| -*c).collect(),
             tolerance: self.tolerance,
         }
     }
