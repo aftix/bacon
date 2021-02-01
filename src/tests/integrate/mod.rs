@@ -36,7 +36,7 @@ fn test_integrate() {
     assert!(approx_eq!(
         f64,
         area,
-        (10.0 as f64).exp() - 1.0,
+        10.0_f64.exp() - 1.0,
         epsilon = 0.0001
     ));
     let area = integrate(0.0, f64::consts::PI, sinsin, 0.00001).unwrap();
@@ -51,7 +51,7 @@ fn test_integrate_simpson() {
     assert!(approx_eq!(
         f64,
         area,
-        (10.0 as f64).exp() - 1.0,
+        10.0_f64.exp() - 1.0,
         epsilon = 0.0001
     ));
     let area = integrate_simpson(0.0, f64::consts::PI, sinsin, 0.00001, 50).unwrap();
@@ -66,7 +66,7 @@ fn test_integrate_fixed() {
     assert!(approx_eq!(
         f64,
         area,
-        (10.0 as f64).exp() - 1.0,
+        10.0_f64.exp() - 1.0,
         epsilon = 0.0001
     ));
     let area = integrate_fixed(0.0, f64::consts::PI, sinsin, 10).unwrap();
@@ -81,7 +81,7 @@ fn test_integrate_gaussian() {
     assert!(approx_eq!(
         f64,
         area,
-        (10.0 as f64).exp() - 1.0,
+        10.0_f64.exp() - 1.0,
         epsilon = 0.0001
     ));
     let area = integrate_gaussian(0.0, f64::consts::PI, sinsin, 0.00001).unwrap();
@@ -126,6 +126,7 @@ fn test_integrate_laguerre() {
     assert!(approx_eq!(f64, area, 0.4518851, epsilon = 0.01));
 }
 
+#[allow(clippy::approx_constant)]
 #[test]
 fn test_integrate_chebyshev() {
     let area = integrate_chebyshev(sin, 0.00001).unwrap();
@@ -138,6 +139,7 @@ fn test_integrate_chebyshev() {
     assert!(approx_eq!(f64, area, 1.5708, epsilon = 0.001));
 }
 
+#[allow(clippy::approx_constant)]
 #[test]
 fn test_integrate_chebyshev_second() {
     let area = integrate_chebyshev_second(sin, 0.00001).unwrap();

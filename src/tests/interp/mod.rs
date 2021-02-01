@@ -5,6 +5,7 @@
  */
 
 use crate::interp::{hermite, lagrange};
+use crate::polynomial::Polynomial;
 
 mod spline;
 
@@ -14,12 +15,20 @@ fn lagrange_interp() {
     let ys: Vec<_> = xs.iter().map(|x| x.cos()).collect();
 
     let poly = lagrange(&xs, &ys, 1e-6).unwrap();
+    // Test rebuilding a Polynomial
+    let rebuilt_poly = Polynomial::from_slice(&poly.get_coefficients());
 
     for x in xs {
         println!("{} {}", poly.evaluate(x), x.cos());
         assert!(approx_eq!(
             f64,
             poly.evaluate(x),
+            x.cos(),
+            epsilon = 0.00001
+        ));
+        assert!(approx_eq!(
+            f64,
+            rebuilt_poly.evaluate(x),
             x.cos(),
             epsilon = 0.00001
         ));

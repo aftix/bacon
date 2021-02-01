@@ -54,9 +54,7 @@ fn polynomial_roots() {
 
     let poly = polynomial![1.0];
     let roots = poly.roots(1e-10, 1000);
-    if let Ok(_) = roots {
-        panic!("Should have not found a root");
-    }
+    assert!(roots.is_err(), "Should have not found a root");
 
     let poly = polynomial![1.0, 0.0, -1.0];
     let cmplx = poly.make_complex();

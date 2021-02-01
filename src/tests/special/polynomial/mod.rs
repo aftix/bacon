@@ -186,6 +186,7 @@ fn hermite_zero_test() {
     }
 }
 
+#[allow(clippy::eq_op)]
 #[test]
 fn laguerre_test() {
     let l = laguerre::<f64>(0, 1e-8).unwrap();
