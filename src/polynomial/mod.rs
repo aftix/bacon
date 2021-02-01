@@ -82,6 +82,13 @@ impl<N: ComplexField> Polynomial<N> {
         self.coefficients.len() - 1
     }
 
+    /// Returns the coefficients in the correct order to recreate the polynomial with Polynomial::from_slice(data: &[N]);
+    pub fn get_coefficients(&self) -> Vec<N> {
+        let mut cln = self.coefficients.clone();
+        cln.reverse();
+        cln
+    }
+
     /// Get the coefficient of a power
     pub fn get_coefficient(&self, ind: usize) -> N {
         if ind >= self.coefficients.len() {
