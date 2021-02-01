@@ -77,5 +77,6 @@ pub const neutron_mass_uncertainty: f64 = 0.00000000095e-27;
 /// NIST CODATA. Maps a string of a value name to a triplet
 /// containing an f64 of its value, an f64 of its uncertainty,
 /// and a string of its units
+#[allow(clippy::inconsistent_digit_grouping)]
 pub static CODATA: phf::Map<&'static str, (f64, f64, &'static str)> =
     include!(concat!(env!("OUT_DIR"), "/codata.rs"));

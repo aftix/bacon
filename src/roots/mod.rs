@@ -294,7 +294,7 @@ where
 /// ```
 pub fn secant<N, S, F>(
     initial: &[N],
-    mut f: F,
+    mut func: F,
     h: <N as ComplexField>::RealField,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
@@ -308,10 +308,10 @@ where
 {
     let mut n = 2;
 
-    let mut x = VectorN::<N, S>::from_column_slice(initial);
-    let mut v = f(x.as_slice());
+    let mut guess = VectorN::<N, S>::from_column_slice(initial);
+    let mut func_eval = func(guess.as_slice());
 
-    let jac = jac_finite_diff(&mut f, &mut x, h);
+    let jac = jac_finite_diff(&mut func, &mut guess, h);
     let lu = jac.lu();
     let try_inv = lu.try_inverse();
     let mut jac_inv = if let Some(inv) = try_inv {
@@ -320,22 +320,22 @@ where
         return Err("Secant: Can not inverse finite element difference jacobian".to_owned());
     };
 
-    let mut s = -&jac_inv * &v;
-    x += &s;
+    let mut shift = -&jac_inv * &func_eval;
+    guess += &shift;
 
     while n < n_max {
-        let w = v;
-        v = f(x.as_slice());
-        let y = &v - &w;
-        let z = -&jac_inv * &y;
-        let s_transpose = s.transpose();
-        let p = (-&s_transpose * &z)[(0, 0)];
+        let func_eval_last = func_eval;
+        func_eval = func(guess.as_slice());
+        let diff = &func_eval - &func_eval_last;
+        let adjustment = -&jac_inv * &diff;
+        let s_transpose = shift.transpose();
+        let p = (-&s_transpose * &adjustment)[(0, 0)];
         let u = &s_transpose * &jac_inv;
-        jac_inv += (&s + &z) * &u / p;
-        s = -&jac_inv * &v;
-        x += &s;
-        if s.norm().abs() <= tol {
-            return Ok(x);
+        jac_inv += (&shift + &adjustment) * &u / p;
+        shift = -&jac_inv * &func_eval;
+        guess += &shift;
+        if shift.norm().abs() <= tol {
+            return Ok(guess);
         }
         n += 1;
     }
@@ -368,18 +368,18 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
         return Err("brent: tolerance must be positive".to_owned());
     }
 
-    let mut a = initial.0;
-    let mut b = initial.1;
-    let mut f_a = f(a);
-    let mut f_b = f(b);
+    let mut left = initial.0;
+    let mut right = initial.1;
+    let mut f_left = f(left);
+    let mut f_right = f(right);
 
     // Make a the maximum
-    if f_a.abs() < f_b.abs() {
-        std::mem::swap(&mut a, &mut b);
-        std::mem::swap(&mut f_a, &mut f_b);
+    if f_left.abs() < f_right.abs() {
+        std::mem::swap(&mut left, &mut right);
+        std::mem::swap(&mut f_left, &mut f_right);
     }
 
-    if !(f_a * f_b).is_sign_negative() {
+    if !(f_left * f_right).is_sign_negative() {
         return Err("brent: initial guesses do not bracket root".to_owned());
     }
 
@@ -387,29 +387,29 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
     let three = N::from_i32(3).unwrap();
     let four = N::from_i32(4).unwrap();
 
-    let mut c = a;
-    let mut f_c = f_a;
-    let mut s = b - f_b * (b - a) / (f_b - f_a);
+    let mut c = left;
+    let mut f_c = f_left;
+    let mut s = right - f_right * (right - left) / (f_right - f_left);
     let mut f_s = f(s);
     let mut mflag = true;
     let mut d = c;
 
-    while !(f_b.abs() < tol || f_s.abs() < tol || (a - b).abs() < tol) {
-        if (f_a - f_c).abs() < tol && (f_b - f_c).abs() < tol {
-            s = (a * f_b * f_c) / ((f_a - f_b) * (f_a - f_c))
-                + (b * f_a * f_c) / ((f_b - f_a) * (f_b - f_c))
-                + (c * f_a * f_b) / ((f_c - f_a) * (f_c - f_b));
+    while !(f_right.abs() < tol || f_s.abs() < tol || (left - right).abs() < tol) {
+        if (f_left - f_c).abs() < tol && (f_right - f_c).abs() < tol {
+            s = (left * f_right * f_c) / ((f_left - f_right) * (f_left - f_c))
+                + (right * f_left * f_c) / ((f_right - f_left) * (f_right - f_c))
+                + (c * f_left * f_right) / ((f_c - f_left) * (f_c - f_right));
         } else {
-            s = b - f_b * (b - a) / (f_b - f_a);
+            s = right - f_right * (right - left) / (f_right - f_left);
         }
 
-        if !(s >= (three * a + b) / four && s <= b)
-            || (mflag && (s - b).abs() >= (b - c) / two)
-            || (!mflag && (s - b).abs() >= (c - d).abs() / two)
-            || (mflag && (b - c).abs() < tol)
+        if !(s >= (three * left + right) / four && s <= right)
+            || (mflag && (s - right).abs() >= (right - c) / two)
+            || (!mflag && (s - right).abs() >= (c - d).abs() / two)
+            || (mflag && (right - c).abs() < tol)
             || (!mflag && (c - d).abs() < tol)
         {
-            s = (a + b) / two;
+            s = (left + right) / two;
             mflag = true;
         } else {
             mflag = false;
@@ -417,26 +417,26 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
 
         f_s = f(s);
         d = c;
-        c = b;
-        f_c = f_b;
-        if (f_a * f_s).is_sign_negative() {
-            b = s;
-            f_b = f_s;
+        c = right;
+        f_c = f_right;
+        if (f_left * f_s).is_sign_negative() {
+            right = s;
+            f_right = f_s;
         } else {
-            a = s;
-            f_a = f_s;
+            left = s;
+            f_left = f_s;
         }
 
-        if f_a.abs() < f_b.abs() {
-            std::mem::swap(&mut a, &mut b);
-            std::mem::swap(&mut f_a, &mut f_b);
+        if f_left.abs() < f_right.abs() {
+            std::mem::swap(&mut left, &mut right);
+            std::mem::swap(&mut f_left, &mut f_right);
         }
     }
 
     if f_s.abs() < tol {
         Ok(s)
     } else {
-        Ok(b)
+        Ok(right)
     }
 }
 
@@ -481,32 +481,32 @@ pub fn itp<N: RealField, F: FnMut(N) -> N>(
         return Err("itp: k_2 must be in (1, 1 + golden_ratio)".to_owned());
     }
 
-    let mut a = initial.0;
-    let mut b = initial.1;
-    let mut f_a = f(a);
-    let mut f_b = f(b);
+    let mut left = initial.0;
+    let mut right = initial.1;
+    let mut f_left = f(left);
+    let mut f_right = f(right);
 
-    if !(f_a * f_b).is_sign_negative() {
+    if !(f_left * f_right).is_sign_negative() {
         return Err("itp: initial guesses must bracket root".to_owned());
     }
 
-    if f_a.is_sign_positive() {
-        std::mem::swap(&mut a, &mut b);
-        std::mem::swap(&mut f_a, &mut f_b);
+    if f_left.is_sign_positive() {
+        std::mem::swap(&mut left, &mut right);
+        std::mem::swap(&mut f_left, &mut f_right);
     }
 
     let two = N::from_i32(2).unwrap();
 
-    let n_half = ((b - a).abs() / (two * tol)).log2().ceil();
+    let n_half = ((right - left).abs() / (two * tol)).log2().ceil();
     let n_max = n_half + n_0;
     let mut j = 0;
 
-    while (b - a).abs() > two * tol {
-        let x_half = (a + b) / two;
-        let r = tol * two.powf(n_max + n_0 - N::from_i32(j).unwrap()) - (b - a) / two;
-        let x_f = (f_b * a - f_a * b) / (f_b - f_a);
+    while (right - left).abs() > two * tol {
+        let x_half = (left + right) / two;
+        let r = tol * two.powf(n_max + n_0 - N::from_i32(j).unwrap()) - (right - left) / two;
+        let x_f = (f_right * left - f_left * right) / (f_right - f_left);
         let sigma = (x_half - x_f) / (x_half - x_f).abs();
-        let delta = k_1 * (b - a).powf(k_2);
+        let delta = k_1 * (right - left).powf(k_2);
         let x_t = if delta <= (x_half - x_f).abs() {
             x_f + sigma * delta
         } else {
@@ -519,17 +519,17 @@ pub fn itp<N: RealField, F: FnMut(N) -> N>(
         };
         let f_itp = f(x_itp);
         if f_itp.is_sign_positive() {
-            b = x_itp;
-            f_b = f_itp;
+            right = x_itp;
+            f_right = f_itp;
         } else if f_itp.is_sign_negative() {
-            a = x_itp;
-            f_a = f_itp;
+            left = x_itp;
+            f_left = f_itp;
         } else {
-            a = x_itp;
-            b = x_itp;
+            left = x_itp;
+            right = x_itp;
         }
         j += 1;
     }
 
-    Ok((a + b) / two)
+    Ok((left + right) / two)
 }

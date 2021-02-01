@@ -211,7 +211,6 @@ impl<N: ComplexField> Polynomial<N> {
         poly_anti.evaluate(upper) - poly_anti.evaluate(lower)
     }
 
-    #[allow(clippy::from_iter_instead_of_collect)]
     /// Divide this polynomial by another, getting a quotient and remainder, using tol to check for 0
     pub fn divide(&self, divisor: &Polynomial<N>) -> Result<(Self, Self), String> {
         if divisor.coefficients.len() == 1

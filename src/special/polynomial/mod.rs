@@ -2,7 +2,6 @@ use crate::polynomial::Polynomial;
 use crate::roots::newton_polynomial;
 use nalgebra::ComplexField;
 use num_traits::FromPrimitive;
-use std::iter::FromIterator;
 
 /// Get the nth legendre polynomial.
 ///
@@ -186,7 +185,6 @@ fn choose<N: ComplexField>(n: u32, k: u32) -> N {
     acc
 }
 
-#[allow(clippy::from_iter_instead_of_collect)]
 /// Get the nth (positive) laguerre polynomial.
 ///
 /// Gets the nth (positive) laguerre polynomial over a specified field. This is
@@ -212,7 +210,7 @@ pub fn laguerre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial
         );
     }
 
-    let mut poly = Polynomial::from_iter(coefficients.iter().copied());
+    let mut poly: Polynomial<N> = coefficients.iter().copied().collect();
     poly.set_tolerance(tol)?;
     Ok(poly)
 }
