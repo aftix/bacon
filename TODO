@@ -7,8 +7,6 @@ triple integrals
 Linear algebra algorithms?
 Euler-cromer method
 PDEs
-better README
-blogpost
 statistics distributions
 generalized laguerre polynomials
 Airy function
@@ -24,3 +22,4 @@ dogleg algorithm
 more newton test
 change to where clauses
 exact jacobian BDF
+geodesic acceleration

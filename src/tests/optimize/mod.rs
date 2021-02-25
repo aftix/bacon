@@ -1,4 +1,4 @@
-use crate::optimize::{curve_fit, curve_fit_jac, linear_fit};
+use crate::optimize::{curve_fit, curve_fit_jac, linear_fit, CurveFitParams};
 use nalgebra::{VectorN, U1, U2};
 use rand::prelude::*;
 use std::f64;
@@ -36,16 +36,18 @@ fn test_curve_fit() {
         .map(|&x| model(x, &VectorN::<f64, U1>::from_column_slice(&[2.0])))
         .collect();
 
-    let solution = curve_fit(model, &xs, &ys, &[1.0], 1e-7, 0.1, 2.0).unwrap();
+    let mut params = CurveFitParams::default();
+    params.tolerance = 1e-7;
+    let solution = curve_fit(model, &xs, &ys, &[1.0], &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
-    let solution = curve_fit(model, &xs, &ys, &[3.0], 1e-7, 0.1, 2.0).unwrap();
+    let solution = curve_fit(model, &xs, &ys, &[3.0], &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
 
     let ys: Vec<f64> = xs
         .iter()
         .map(|&x| gaussian(x, &VectorN::<f64, U2>::from_column_slice(&[5.0, 0.5])))
         .collect();
-    let solution = curve_fit(gaussian, &xs, &ys, &[5.5, 1.0], 1e-7, 0.1, 2.0).unwrap();
+    let solution = curve_fit(gaussian, &xs, &ys, &[5.5, 1.0], &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 5.0, epsilon = 0.5));
     assert!(approx_eq!(f64, solution[1], 0.5, epsilon = 0.5));
 }
@@ -58,16 +60,18 @@ fn test_curve_fit_jac() {
         .map(|&x| model(x, &VectorN::<f64, U1>::from_column_slice(&[2.0])))
         .collect();
 
-    let solution = curve_fit_jac(model, &xs, &ys, &[1.0], 1e-7, model_jac, 2.0).unwrap();
+    let mut params = CurveFitParams::default();
+    params.tolerance = 1e-7;
+    let solution = curve_fit_jac(model, &xs, &ys, &[1.0], model_jac, &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
-    let solution = curve_fit_jac(model, &xs, &ys, &[3.0], 1e-7, model_jac, 2.0).unwrap();
+    let solution = curve_fit_jac(model, &xs, &ys, &[3.0], model_jac, &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
 
     let ys: Vec<f64> = xs
         .iter()
         .map(|&x| gaussian(x, &VectorN::<f64, U2>::from_column_slice(&[5.0, 0.5])))
         .collect();
-    let solution = curve_fit_jac(gaussian, &xs, &ys, &[5.5, 1.0], 1e-7, gaussian_jac, 2.0).unwrap();
+    let solution = curve_fit_jac(gaussian, &xs, &ys, &[5.5, 1.0], gaussian_jac, &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 5.0, epsilon = 1.0));
     assert!(approx_eq!(f64, solution[1], 0.5, epsilon = 1.0));
 }
