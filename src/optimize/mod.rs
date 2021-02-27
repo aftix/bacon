@@ -75,6 +75,26 @@ fn jac_analytic<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> Vect
     }
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+pub struct CurveFitParams<N: ComplexField> {
+    pub damping: N::RealField,
+    pub tolerance: N::RealField,
+    pub h: N::RealField,
+    pub damping_mult: N::RealField,
+}
+
+impl<N: ComplexField> Default for CurveFitParams<N> {
+    fn default() -> Self {
+        CurveFitParams {
+            damping: N::RealField::from_f64(2.0).unwrap(),
+            tolerance: N::RealField::from_f64(1e-5).unwrap(),
+            h: N::RealField::from_f64(0.1).unwrap(),
+            damping_mult: N::RealField::from_f64(1.5).unwrap(),
+        }
+    }
+}
+
 /// Fit a curve using the Levenberg-Marquardt algorithm.
 ///
 /// Uses finite differences of h to calculate the jacobian. If jacobian
@@ -86,13 +106,16 @@ pub fn curve_fit<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> N>(
     xs: &[N],
     ys: &[N],
     initial: &[N],
-    tol: N::RealField,
-    h: N::RealField,
-    mut damping: N::RealField,
+    params: &CurveFitParams<N>,
 ) -> Result<VectorN<N, V>, String>
 where
     DefaultAllocator: Allocator<N, V>,
 {
+    let tol = params.tolerance;
+    let mut damping = params.damping;
+    let h = params.h;
+    let damping_mult = params.damping_mult;
+
     if !tol.is_sign_positive() {
         return Err("curve_fit: tol must be positive".to_owned());
     }
@@ -114,8 +137,6 @@ where
     let mut jac: DMatrix<N> = DMatrix::identity(xs.len(), params.len());
     jac_finite_differences(&mut f, xs, &mut params, &mut jac, h);
     let mut jac_transpose = jac.transpose();
-
-    let damping_mult = N::RealField::from_f64(1.5).unwrap();
 
     // Get the initial sum of square residuals
     let mut resid = Vec::with_capacity(xs.len());
@@ -252,13 +273,16 @@ pub fn curve_fit_jac<
     xs: &[N],
     ys: &[N],
     initial: &[N],
-    tol: N::RealField,
     mut jacobian: G,
-    mut damping: N::RealField,
+    params: &CurveFitParams<N>,
 ) -> Result<VectorN<N, V>, String>
 where
     DefaultAllocator: Allocator<N, V>,
 {
+    let tol = params.tolerance;
+    let mut damping = params.damping;
+    let damping_mult = params.damping_mult;
+
     if !tol.is_sign_positive() {
         return Err("curve_fit_jac: tol must be positive".to_owned());
     }
@@ -276,8 +300,6 @@ where
     let mut jac: DMatrix<N> = DMatrix::identity(xs.len(), params.len());
     jac_analytic(&mut jacobian, xs, &mut params, &mut jac);
     let mut jac_transpose = jac.transpose();
-
-    let damping_mult = N::RealField::from_f64(1.5).unwrap();
 
     // Get the initial sum of square residuals
     let mut resid = Vec::with_capacity(xs.len());
