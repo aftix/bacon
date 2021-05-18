@@ -13,7 +13,7 @@ use nalgebra::ComplexField;
 ///
 /// Making h too small will lead to round-off error.
 pub fn derivative<N: ComplexField>(
-    f: fn(N::RealField) -> N,
+    f: impl Fn(N::RealField) -> N,
     x: N::RealField,
     h: N::RealField,
 ) -> N {
@@ -29,7 +29,7 @@ pub fn derivative<N: ComplexField>(
 ///
 /// Making h too small will lead to round-off error.
 pub fn second_derivative<N: ComplexField>(
-    f: fn(N::RealField) -> N,
+    f: impl Fn(N::RealField) -> N,
     x: N::RealField,
     h: N::RealField,
 ) -> N {
