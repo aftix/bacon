@@ -7,7 +7,6 @@ use std::{any::TypeId, f64, iter::FromIterator, ops};
 
 /// Polynomial on a ComplexField.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Polynomial<N: ComplexField> {
     // Index 0 is constant, 1 is linear, etc.
     coefficients: Vec<N>,

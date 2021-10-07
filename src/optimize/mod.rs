@@ -76,7 +76,6 @@ fn jac_analytic<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> Vect
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct CurveFitParams<N: ComplexField> {
     pub damping: N::RealField,
     pub tolerance: N::RealField,

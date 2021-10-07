@@ -72,7 +72,6 @@ where
 /// on the higher and lower order coefficients. It is up to the
 /// BDFSolver to correctly implement the coefficients.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct BDFInfo<N, S, O>
 where
     N: ComplexField,
@@ -486,7 +485,6 @@ where
 ///     Ok(())
 /// }
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct BDF6<N, S>
 where
     N: ComplexField,
@@ -664,7 +662,6 @@ where
 ///     Ok(())
 /// }
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct BDF2<N, S>
 where
     N: ComplexField,

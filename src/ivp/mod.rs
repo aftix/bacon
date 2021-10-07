@@ -122,7 +122,6 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(serialize, derive(Serialize, Deserialize))]
 pub struct Euler<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,

@@ -74,7 +74,6 @@ where
 /// based entirely on the Butch Tableaux coefficients. It is up
 /// to the RungeKuttaSolver to set up RKInfo. See RK45 for an example.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct RKInfo<N: ComplexField, S: DimName, O: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
@@ -368,7 +367,6 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct RK45<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
@@ -601,7 +599,6 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct RK23<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,

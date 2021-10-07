@@ -8,7 +8,6 @@ use crate::polynomial::Polynomial;
 use nalgebra::{ComplexField, RealField};
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct CubicSpline<N: ComplexField> {
     cubics: Vec<Polynomial<N>>,
     ranges: Vec<(N::RealField, N::RealField)>,

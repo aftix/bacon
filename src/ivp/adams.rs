@@ -60,7 +60,6 @@ where
 /// the predictor and correctorr coefficients. It is up to the AdamsSolver
 /// to set up AdamsInfo with the correct coefficients.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct AdamsInfo<N: ComplexField, S: DimName, O: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
@@ -465,7 +464,6 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Adams<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
@@ -629,7 +627,6 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Adams2<N: ComplexField, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
