@@ -74,11 +74,12 @@ where
 /// based entirely on the Butch Tableaux coefficients. It is up
 /// to the RungeKuttaSolver to set up RKInfo. See RK45 for an example.
 #[derive(Debug, Clone)]
-pub struct RKInfo<N: ComplexField, S: DimName, O: DimName>
+pub struct RKInfo<N: ComplexField + FromPrimitive, S: DimName, O: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, O>,
     DefaultAllocator: Allocator<N, O, O>,
+    <N as ComplexField>::RealField: FromPrimitive,
 {
     dt: Option<N::RealField>,
     time: Option<N::RealField>,
@@ -93,11 +94,12 @@ where
     error_coefficients: VectorN<N, O>,
 }
 
-impl<N: ComplexField, S: DimName, O: DimName> RKInfo<N, S, O>
+impl<N: ComplexField + FromPrimitive, S: DimName, O: DimName> RKInfo<N, S, O>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, O>,
     DefaultAllocator: Allocator<N, O, O>,
+    <N as ComplexField>::RealField: FromPrimitive,
 {
     fn new() -> Self {
         RKInfo {
@@ -116,12 +118,14 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName, O: DimName> IVPSolver<N, S> for RKInfo<N, S, O>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName, O: DimName> IVPSolver<N, S>
+    for RKInfo<N, S, O>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, O>,
     DefaultAllocator: Allocator<N, O, O>,
     DefaultAllocator: Allocator<N, S, O>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
         &mut self,
@@ -367,7 +371,7 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct RK45<N: ComplexField, S: DimName>
+pub struct RK45<N: ComplexField + FromPrimitive, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U6>,
@@ -375,11 +379,12 @@ where
     DefaultAllocator: Allocator<N, S, U6>,
     DefaultAllocator: Allocator<N::RealField, U6>,
     DefaultAllocator: Allocator<N::RealField, U6, U6>,
+    <N as ComplexField>::RealField: FromPrimitive,
 {
     info: RKInfo<N, S, U6>,
 }
 
-impl<N: ComplexField, S: DimName> RK45<N, S>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName> RK45<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U6>,
@@ -387,6 +392,7 @@ where
     DefaultAllocator: Allocator<N, S, U6>,
     DefaultAllocator: Allocator<N::RealField, U6>,
     DefaultAllocator: Allocator<N::RealField, U6, U6>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -419,7 +425,7 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> RungeKuttaSolver<N, S, U6> for RK45<N, S>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName> RungeKuttaSolver<N, S, U6> for RK45<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U6>,
@@ -427,6 +433,7 @@ where
     DefaultAllocator: Allocator<N::RealField, U6>,
     DefaultAllocator: Allocator<N::RealField, U6, U6>,
     DefaultAllocator: Allocator<N, S, U6>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn t_coefficients() -> VectorN<N::RealField, U6> {
         VectorN::<N::RealField, U6>::from_column_slice(&[
@@ -440,7 +447,7 @@ where
     }
 
     fn k_coefficients() -> MatrixMN<N::RealField, U6, U6> {
-        MatrixMN::<N::RealField, U6, U6>::new(
+        MatrixMN::<N::RealField, U6, U6>::from_vec(vec![
             // Row 0
             N::RealField::zero(),
             N::RealField::zero(),
@@ -483,7 +490,7 @@ where
             N::RealField::from_f64(1859.0 / 4104.0).unwrap(),
             N::RealField::from_f64(-11.0 / 40.0).unwrap(),
             N::RealField::zero(),
-        )
+        ])
     }
 
     fn avg_coefficients() -> VectorN<N::RealField, U6> {
@@ -554,7 +561,7 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> From<RK45<N, S>> for RKInfo<N, S, U6>
+impl<N: ComplexField + FromPrimitive, S: DimName> From<RK45<N, S>> for RKInfo<N, S, U6>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U6>,
@@ -562,6 +569,7 @@ where
     DefaultAllocator: Allocator<N, U6, U6>,
     DefaultAllocator: Allocator<N::RealField, U6>,
     DefaultAllocator: Allocator<N::RealField, U6>,
+    <N as ComplexField>::RealField: FromPrimitive,
 {
     fn from(rk: RK45<N, S>) -> RKInfo<N, S, U6> {
         rk.info
@@ -599,7 +607,7 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct RK23<N: ComplexField, S: DimName>
+pub struct RK23<N: ComplexField + FromPrimitive + Copy, S: DimName>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U4>,
@@ -607,11 +615,12 @@ where
     DefaultAllocator: Allocator<N, S, U4>,
     DefaultAllocator: Allocator<N::RealField, U4>,
     DefaultAllocator: Allocator<N::RealField, U4, U4>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     info: RKInfo<N, S, U4>,
 }
 
-impl<N: ComplexField, S: DimName> RK23<N, S>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName> RK23<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U4>,
@@ -619,6 +628,7 @@ where
     DefaultAllocator: Allocator<N, S, U4>,
     DefaultAllocator: Allocator<N::RealField, U4>,
     DefaultAllocator: Allocator<N::RealField, U4, U4>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -651,7 +661,7 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> RungeKuttaSolver<N, S, U4> for RK23<N, S>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName> RungeKuttaSolver<N, S, U4> for RK23<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U4>,
@@ -659,6 +669,7 @@ where
     DefaultAllocator: Allocator<N::RealField, U4>,
     DefaultAllocator: Allocator<N::RealField, U4, U4>,
     DefaultAllocator: Allocator<N, S, U4>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn t_coefficients() -> VectorN<N::RealField, U4> {
         VectorN::<N::RealField, U4>::from_column_slice(&[
@@ -670,7 +681,7 @@ where
     }
 
     fn k_coefficients() -> MatrixMN<N::RealField, U4, U4> {
-        MatrixMN::<N::RealField, U4, U4>::new(
+        MatrixMN::<N::RealField, U4, U4>::from_vec(vec![
             // Row 0
             N::RealField::zero(),
             N::RealField::zero(),
@@ -691,7 +702,7 @@ where
             N::RealField::from_f64(1.0 / 3.0).unwrap(),
             N::RealField::from_f64(4.0 / 9.0).unwrap(),
             N::RealField::zero(),
-        )
+        ])
     }
 
     fn avg_coefficients() -> VectorN<N::RealField, U4> {
@@ -758,7 +769,7 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> From<RK23<N, S>> for RKInfo<N, S, U4>
+impl<N: ComplexField + FromPrimitive + Copy, S: DimName> From<RK23<N, S>> for RKInfo<N, S, U4>
 where
     DefaultAllocator: Allocator<N, S>,
     DefaultAllocator: Allocator<N, U4>,
@@ -766,6 +777,7 @@ where
     DefaultAllocator: Allocator<N, U6, U4>,
     DefaultAllocator: Allocator<N::RealField, U4>,
     DefaultAllocator: Allocator<N::RealField, U4>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn from(rk: RK23<N, S>) -> RKInfo<N, S, U4> {
         rk.info

@@ -20,7 +20,13 @@ use num_traits::FromPrimitive;
 ///     assert!((p_3.get_coefficient(3) - 2.5).abs() < 0.00001);
 /// }
 ///
-pub fn legendre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial<N>, String> {
+pub fn legendre<N: ComplexField + FromPrimitive + Copy>(
+    n: u32,
+    tol: N::RealField,
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         let mut poly = polynomial![N::one()];
         poly.set_tolerance(tol)?;
@@ -53,12 +59,15 @@ pub fn legendre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial
 /// Get the zeros of the nth legendre polynomial.
 /// Calculate zeros to tolerance `tol`, have polynomials
 /// with tolerance `poly_tol`.
-pub fn legendre_zeros<N: ComplexField>(
+pub fn legendre_zeros<N: ComplexField + FromPrimitive + Copy>(
     n: u32,
     tol: N::RealField,
     poly_tol: N::RealField,
     n_max: usize,
-) -> Result<Vec<N>, String> {
+) -> Result<Vec<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         return Ok(vec![]);
     }
@@ -98,7 +107,13 @@ pub fn legendre_zeros<N: ComplexField>(
 ///     assert!((h_3.get_coefficient(3) - 8.0).abs() < 0.0001);
 /// }
 /// ```
-pub fn hermite<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial<N>, String> {
+pub fn hermite<N: ComplexField + FromPrimitive + Copy>(
+    n: u32,
+    tol: N::RealField,
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         let mut poly = polynomial![N::one()];
         poly.set_tolerance(tol)?;
@@ -127,12 +142,15 @@ pub fn hermite<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial<
 
 /// Get the zeros of the nth Hermite polynomial within tolerance `tol` with polynomial
 /// tolerance `poly_tol`
-pub fn hermite_zeros<N: ComplexField>(
+pub fn hermite_zeros<N: ComplexField + FromPrimitive + Copy>(
     n: u32,
     tol: N::RealField,
     poly_tol: N::RealField,
     n_max: usize,
-) -> Result<Vec<N>, String> {
+) -> Result<Vec<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         return Ok(vec![]);
     }
@@ -145,7 +163,7 @@ pub fn hermite_zeros<N: ComplexField>(
     // Get initial guesses of zeros with asymptotic formula
     let mut zeros = Vec::with_capacity(n as usize);
     let special = N::from_f64(3.3721 / 6.0.cbrt()).unwrap();
-    let third = N::RealField::from_f64(1.0 / 3.0).unwrap();
+    let third = N::from_f64(1.0 / 3.0).unwrap().real();
     for i in 1..=n {
         let sqrt = N::from_u32(2 * i).unwrap().sqrt();
         zeros.push(sqrt - special * sqrt.powf(-third));
@@ -166,7 +184,7 @@ pub fn hermite_zeros<N: ComplexField>(
     Ok(zs)
 }
 
-fn factorial<N: ComplexField>(k: u32) -> N {
+fn factorial<N: ComplexField + FromPrimitive>(k: u32) -> N {
     let mut acc = N::one();
     for i in 2..=k {
         acc *= N::from_u32(i).unwrap();
@@ -174,7 +192,7 @@ fn factorial<N: ComplexField>(k: u32) -> N {
     acc
 }
 
-fn choose<N: ComplexField>(n: u32, k: u32) -> N {
+fn choose<N: ComplexField + FromPrimitive>(n: u32, k: u32) -> N {
     let mut acc = N::one();
     for i in n - k + 1..=n {
         acc *= N::from_u32(i).unwrap();
@@ -202,7 +220,13 @@ fn choose<N: ComplexField>(n: u32, k: u32) -> N {
 ///     assert!((p_3.get_coefficient(3) + 1.0/6.0).abs() < 0.00001);
 /// }
 ///
-pub fn laguerre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial<N>, String> {
+pub fn laguerre<N: ComplexField + Copy + FromPrimitive>(
+    n: u32,
+    tol: N::RealField,
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     let mut coefficients = Vec::with_capacity(n as usize + 1);
     for k in 0..=n {
         coefficients.push(
@@ -216,12 +240,15 @@ pub fn laguerre<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial
 }
 
 /// Get the zeros of the nth Laguerre polynomial
-pub fn laguerre_zeros<N: ComplexField>(
+pub fn laguerre_zeros<N: ComplexField + Copy + FromPrimitive>(
     n: u32,
     tol: N::RealField,
     poly_tol: N::RealField,
     n_max: usize,
-) -> Result<Vec<N>, String> {
+) -> Result<Vec<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         return Ok(vec![]);
     }
@@ -261,7 +288,13 @@ pub fn laguerre_zeros<N: ComplexField>(
 ///     assert!((t_3.get_coefficient(3) - 4.0).abs() < 0.00001);
 /// }
 ///
-pub fn chebyshev<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomial<N>, String> {
+pub fn chebyshev<N: ComplexField + FromPrimitive + Copy>(
+    n: u32,
+    tol: N::RealField,
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         let mut poly = polynomial![N::one()];
         poly.set_tolerance(tol)?;
@@ -300,10 +333,13 @@ pub fn chebyshev<N: ComplexField>(n: u32, tol: N::RealField) -> Result<Polynomia
 ///     assert!((u_3.get_coefficient(3) - 8.0).abs() < 0.00001);
 /// }
 ///
-pub fn chebyshev_second<N: ComplexField>(
+pub fn chebyshev_second<N: ComplexField + FromPrimitive + Copy>(
     n: u32,
     tol: N::RealField,
-) -> Result<Polynomial<N>, String> {
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if n == 0 {
         let mut poly = polynomial![N::one()];
         poly.set_tolerance(tol)?;

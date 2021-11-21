@@ -1,8 +1,8 @@
 [package]
 name = "bacon-sci"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["aftix <aftix@aftix.xyz>"]
-edition = "2018"
+edition = "2021"
 license="MIT"
 description="Scientific computing in Rust"
 homepage="https://github.com/aftix/bacon"
@@ -16,9 +16,9 @@ float-cmp="0.8"
 rand="0.8"
 
 [dependencies]
-nalgebra="0.24"
-num-complex="0.3"
-num-traits="0.2"
+nalgebra="=0.29.0"
+num-complex="=0.4.0"
+num-traits="=0.2.14"
 phf = "0.8"
 
 [build-dependencies]

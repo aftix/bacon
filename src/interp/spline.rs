@@ -6,14 +6,21 @@
 
 use crate::polynomial::Polynomial;
 use nalgebra::{ComplexField, RealField};
+use num_traits::FromPrimitive;
 
 #[derive(Debug, Clone)]
-pub struct CubicSpline<N: ComplexField> {
+pub struct CubicSpline<N: ComplexField + FromPrimitive + Copy>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     cubics: Vec<Polynomial<N>>,
     ranges: Vec<(N::RealField, N::RealField)>,
 }
 
-impl<N: ComplexField> CubicSpline<N> {
+impl<N: ComplexField + FromPrimitive + Copy> CubicSpline<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     pub fn evaluate(&self, x: N::RealField) -> Result<N, String> {
         if self.cubics.is_empty() {
             return Err("CubicSpline evaluate: Empty spline".to_owned());
@@ -72,11 +79,14 @@ impl<N: ComplexField> CubicSpline<N> {
 ///     }
 /// }
 /// ```
-pub fn spline_free<N: ComplexField>(
+pub fn spline_free<N: ComplexField + FromPrimitive + Copy>(
     xs: &[N::RealField],
     ys: &[N],
     tol: N::RealField,
-) -> Result<CubicSpline<N>, String> {
+) -> Result<CubicSpline<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if xs.len() != ys.len() {
         return Err("spline_free: xs and ys must be same length".to_owned());
     }
@@ -188,12 +198,15 @@ pub fn spline_free<N: ComplexField>(
 ///     }
 /// }
 /// ```
-pub fn spline_clamped<N: ComplexField>(
+pub fn spline_clamped<N: ComplexField + FromPrimitive + Copy>(
     xs: &[N::RealField],
     ys: &[N],
     (f_0, f_n): (N, N),
     tol: N::RealField,
-) -> Result<CubicSpline<N>, String> {
+) -> Result<CubicSpline<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if xs.len() != ys.len() {
         return Err("spline_clamped: xs and ys must be same length".to_owned());
     }

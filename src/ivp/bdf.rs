@@ -74,7 +74,8 @@ where
 #[derive(Debug, Clone)]
 pub struct BDFInfo<N, S, O>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive,
+    <N as ComplexField>::RealField: FromPrimitive,
     S: DimName + DimMin<S, Output = S>,
     O: DimName,
     DefaultAllocator: Allocator<N, S>
@@ -99,7 +100,8 @@ where
 
 impl<N, S, O> BDFInfo<N, S, O>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive,
+    <N as ComplexField>::RealField: FromPrimitive,
     S: DimName + DimMin<S, Output = S>,
     O: DimName,
     DefaultAllocator: Allocator<N, S>
@@ -128,7 +130,7 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn rk4<
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
     S: DimName,
     T: Clone,
     F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
@@ -143,6 +145,7 @@ fn rk4<
 ) -> Result<(), String>
 where
     DefaultAllocator: Allocator<N, S>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     let mut state = VectorN::from_column_slice(initial);
     let mut time = time;
@@ -176,7 +179,8 @@ where
 
 impl<N, S, O> Default for BDFInfo<N, S, O>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive,
+    <N as ComplexField>::RealField: FromPrimitive,
     S: DimName + DimMin<S, Output = S>,
     O: DimName,
     DefaultAllocator: Allocator<N, S>
@@ -192,7 +196,8 @@ where
 
 impl<N, S, O> IVPSolver<N, S> for BDFInfo<N, S, O>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     O: DimName,
     DefaultAllocator: Allocator<N, S>
@@ -487,7 +492,8 @@ where
 #[derive(Debug, Clone)]
 pub struct BDF6<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U7>
@@ -500,7 +506,8 @@ where
 
 impl<N, S> BDF6<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U7>
@@ -523,7 +530,8 @@ where
 
 impl<N, S> Default for BDF6<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U7>
@@ -538,7 +546,8 @@ where
 
 impl<N, S> BDFSolver<N, S, U7> for BDF6<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U7>
@@ -619,7 +628,8 @@ where
 
 impl<N, S> From<BDF6<N, S>> for BDFInfo<N, S, U7>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U7>
@@ -664,7 +674,8 @@ where
 #[derive(Debug, Clone)]
 pub struct BDF2<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive,
+    <N as ComplexField>::RealField: FromPrimitive,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U3>
@@ -677,7 +688,8 @@ where
 
 impl<N, S> BDF2<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U3>
@@ -700,7 +712,8 @@ where
 
 impl<N, S> Default for BDF2<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U3>
@@ -715,7 +728,8 @@ where
 
 impl<N, S> BDFSolver<N, S, U3> for BDF2<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U3>
@@ -788,7 +802,8 @@ where
 
 impl<N, S> From<BDF2<N, S>> for BDFInfo<N, S, U3>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive,
+    <N as ComplexField>::RealField: FromPrimitive,
     S: DimName + DimMin<S, Output = S>,
     DefaultAllocator: Allocator<N, S>
         + Allocator<N, U3>

@@ -16,17 +16,20 @@ use tables::WEIGHTS_DE;
 
 // Taken and modified from https://github.com/Eh2406/quadrature/blob/master/src/double_exponential/mod.rs
 // published under the BSD license
-fn integrate_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
+fn integrate_core<N: ComplexField + FromPrimitive + Copy, F: FnMut(N::RealField) -> N>(
     mut f: F,
     tol: N::RealField,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     let mut error_estimate = N::RealField::one() + tol;
     let mut num_function_evaluations = 1;
     let mut current_delta = N::RealField::zero();
 
     let half = N::from_f64(0.5).unwrap();
-    let one_point_nine = N::RealField::from_f64(1.9).unwrap();
-    let two_point_one = N::RealField::from_f64(2.1).unwrap();
+    let one_point_nine = N::from_f64(1.9).unwrap().real();
+    let two_point_one = N::from_f64(2.1).unwrap().real();
     let pi = N::from_f64(f64::consts::PI).unwrap();
 
     let mut integral = pi * f(N::RealField::zero());
@@ -35,7 +38,7 @@ fn integrate_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
         let new_contribution = weight
             .iter()
             .map(|&(w, x)| {
-                let x = N::RealField::from_f64(x).unwrap();
+                let x = N::from_f64(x).unwrap().real();
                 N::from_f64(w).unwrap() * (f(x) + f(-x))
             })
             .fold(N::zero(), |sum, x| sum + x);
@@ -87,12 +90,15 @@ fn integrate_core<N: ComplexField, F: FnMut(N::RealField) -> N>(
     }
 }
 
-pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
+pub fn integrate<N: ComplexField + FromPrimitive + Copy, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
     mut f: F,
     tol: N::RealField,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if left >= right {
         return Err("integrate: left must be less than right".to_owned());
     }
@@ -100,7 +106,7 @@ pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
         return Err("integrate: tolerance must be positive".to_owned());
     }
 
-    let half = N::RealField::from_f64(0.5).unwrap();
+    let half = N::from_f64(0.5).unwrap().real();
 
     let scale = (right - left) * half;
     let shift = (right + left) * half;
@@ -123,13 +129,16 @@ pub fn integrate<N: ComplexField, F: FnMut(N::RealField) -> N>(
 /// Given a function and end points, numerically integrate using adaptive
 /// simpson's rule until the error is within tolerance or the maximum
 /// iterations are exceeded.
-pub fn integrate_simpson<N: ComplexField, F: FnMut(N::RealField) -> N>(
+pub fn integrate_simpson<N: ComplexField + FromPrimitive + Copy, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
     mut f: F,
     tol: N::RealField,
     n_max: usize,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if left >= right {
         return Err("integrate: left must be less than right".to_owned());
     }
@@ -139,13 +148,13 @@ pub fn integrate_simpson<N: ComplexField, F: FnMut(N::RealField) -> N>(
 
     let sixth = N::from_f64(1.0 / 6.0).unwrap();
     let third = N::from_f64(1.0 / 3.0).unwrap();
-    let half_real = N::RealField::from_f64(0.5).unwrap();
-    let one_and_a_half_real = N::RealField::from_f64(1.5).unwrap();
+    let half_real = N::from_f64(0.5).unwrap().real();
+    let one_and_a_half_real = N::from_f64(1.5).unwrap().real();
     let four = N::from_i32(4).unwrap();
 
     let mut area = N::zero();
     let mut i = 1;
-    let mut tol_i = vec![N::RealField::from_i32(10).unwrap() * tol];
+    let mut tol_i = vec![N::from_i32(10).unwrap().real() * tol];
     let mut left_i = vec![left];
     let mut step_i = vec![(right - left) * half_real];
     let mut f_ai = vec![f(left)];
@@ -228,18 +237,21 @@ pub fn integrate_simpson<N: ComplexField, F: FnMut(N::RealField) -> N>(
 ///
 /// Given a function and end points, numerically integrate
 /// using Romberg integration. Uses `n` steps.
-pub fn integrate_fixed<N: ComplexField, F: FnMut(N::RealField) -> N>(
+pub fn integrate_fixed<N: ComplexField + FromPrimitive + Copy, F: FnMut(N::RealField) -> N>(
     left: N::RealField,
     right: N::RealField,
     mut f: F,
     n: usize,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if left >= right {
         return Err("integrate_fixed: left must be less than right".to_owned());
     }
 
     let half = N::from_f64(0.5).unwrap();
-    let half_real = N::RealField::from_f64(0.5).unwrap();
+    let half_real = N::from_f64(0.5).unwrap().real();
     let four = N::from_i32(4).unwrap();
 
     let mut h = right - left;
@@ -251,7 +263,7 @@ pub fn integrate_fixed<N: ComplexField, F: FnMut(N::RealField) -> N>(
     for i in 2..=n {
         let mut acc = N::zero();
         for k in 1..=(1 << (i - 2)) {
-            acc += f(left + N::RealField::from_f64(k as f64 - 0.5).unwrap() * h);
+            acc += f(left + N::from_f64(k as f64 - 0.5).unwrap().real() * h);
         }
         acc *= N::from_real(h);
         acc += prev_rows[0];

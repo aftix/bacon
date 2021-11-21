@@ -9,7 +9,7 @@ use nalgebra::{
     dimension::{DimMin, DimMinimum},
     ComplexField, DefaultAllocator, DimName, MatrixN, RealField, VectorN, U1,
 };
-use num_traits::Zero;
+use num_traits::{FromPrimitive, Zero};
 
 mod polynomial;
 pub use polynomial::*;
@@ -44,7 +44,7 @@ pub use polynomial::*;
 ///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn bisection<N: RealField, F: FnMut(N) -> N>(
+pub fn bisection<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
     (mut left, mut right): (N, N),
     mut f: F,
     tol: N,
@@ -190,7 +190,8 @@ pub fn newton<N, S, F, G>(
     n_max: usize,
 ) -> Result<VectorN<N, S>, String>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     F: FnMut(&[N]) -> VectorN<N, S>,
     G: FnMut(&[N]) -> MatrixN<N, S>,
@@ -236,7 +237,8 @@ fn jac_finite_diff<N, S, F>(
     h: <N as ComplexField>::RealField,
 ) -> MatrixN<N, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName,
     F: FnMut(&[N]) -> VectorN<N, S>,
     DefaultAllocator: Allocator<N, S> + Allocator<N, S, S>,
@@ -300,7 +302,8 @@ pub fn secant<N, S, F>(
     n_max: usize,
 ) -> Result<VectorN<N, S>, String>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     F: FnMut(&[N]) -> VectorN<N, S>,
     DefaultAllocator:
@@ -359,7 +362,7 @@ where
 ///   let solution = brent((0.1, -0.1), cubic, 1e-5).unwrap();
 /// }
 /// ```
-pub fn brent<N: RealField, F: FnMut(N) -> N>(
+pub fn brent<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
     initial: (N, N),
     mut f: F,
     tol: N,
@@ -461,7 +464,7 @@ pub fn brent<N: RealField, F: FnMut(N) -> N>(
 ///   let solution = itp((0.1, -0.1), cubic, 0.1, 2.0, 0.99, 1e-5).unwrap();
 /// }
 /// ```
-pub fn itp<N: RealField, F: FnMut(N) -> N>(
+pub fn itp<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
     initial: (N, N),
     mut f: F,
     k_1: N,

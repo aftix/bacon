@@ -31,12 +31,15 @@ use num_traits::{FromPrimitive, Zero};
 ///   let solution = newton_polynomial(0.5, &polynomial, 0.0001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton_polynomial<N: ComplexField>(
+pub fn newton_polynomial<N: ComplexField + FromPrimitive + Copy>(
     initial: N,
     poly: &Polynomial<N>,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     let mut n = 0;
 
     let mut guess = initial;
@@ -89,12 +92,15 @@ pub fn newton_polynomial<N: ComplexField>(
 ///   let solution = muller_polynomial((0.0, 1.5, 2.0), &polynomial, 0.0001, 1000).unwrap();
 /// }
 /// ```
-pub fn muller_polynomial<N: ComplexField>(
+pub fn muller_polynomial<N: ComplexField + FromPrimitive + Copy>(
     initial: (N, N, N),
     poly: &Polynomial<N>,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<Complex<<N as ComplexField>::RealField>, String> {
+) -> Result<Complex<<N as ComplexField>::RealField>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     let poly = poly.make_complex();
     let mut n = 0;
     let mut poly_0 = Complex::<N::RealField>::new(initial.0.real(), initial.0.imaginary());

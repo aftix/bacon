@@ -7,7 +7,10 @@ use std::{any::TypeId, f64, iter::FromIterator, ops};
 
 /// Polynomial on a ComplexField.
 #[derive(Debug, Clone)]
-pub struct Polynomial<N: ComplexField> {
+pub struct Polynomial<N: ComplexField + FromPrimitive + Copy>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     // Index 0 is constant, 1 is linear, etc.
     coefficients: Vec<N>,
     tolerance: <N as ComplexField>::RealField,
@@ -20,7 +23,10 @@ macro_rules! polynomial {
   }
 }
 
-impl<N: ComplexField> Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     /// Returns the zero polynomial on a given field
     pub fn new() -> Self {
         Polynomial {
@@ -475,7 +481,7 @@ fn bit_reverse(mut k: usize, num_bits: usize) -> usize {
 }
 
 // Assumes vec is a power of 2 length
-fn bit_reverse_copy<N: RealField>(vec: &[Complex<N>]) -> Vec<Complex<N>> {
+fn bit_reverse_copy<N: RealField + Copy>(vec: &[Complex<N>]) -> Vec<Complex<N>> {
     let len = vec.len();
     let mut result = vec![Complex::new(N::zero(), N::zero()); len];
     let num_bits = (len as f64).log2() as usize;
@@ -485,7 +491,10 @@ fn bit_reverse_copy<N: RealField>(vec: &[Complex<N>]) -> Vec<Complex<N>> {
     result
 }
 
-impl<N: ComplexField> FromIterator<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> FromIterator<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn from_iter<I: IntoIterator<Item = N>>(iter: I) -> Polynomial<N> {
         Polynomial {
             coefficients: Vec::from_iter(iter),
@@ -494,13 +503,19 @@ impl<N: ComplexField> FromIterator<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> Default for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> Default for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<N: ComplexField> Zero for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> Zero for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn zero() -> Polynomial<N> {
         Polynomial::new()
     }
@@ -517,7 +532,10 @@ impl<N: ComplexField> Zero for Polynomial<N> {
 
 // Operator overloading
 
-impl<N: ComplexField> ops::Add<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(mut self, rhs: N) -> Polynomial<N> {
@@ -526,7 +544,10 @@ impl<N: ComplexField> ops::Add<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Add<N> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<N> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(self, rhs: N) -> Polynomial<N> {
@@ -539,7 +560,10 @@ impl<N: ComplexField> ops::Add<N> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Add<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(mut self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -556,7 +580,10 @@ impl<N: ComplexField> ops::Add<Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Add<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(mut self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -574,7 +601,10 @@ impl<N: ComplexField> ops::Add<&Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Add<Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -601,7 +631,10 @@ impl<N: ComplexField> ops::Add<Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Add<&Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Add<&Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn add(self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -628,13 +661,19 @@ impl<N: ComplexField> ops::Add<&Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::AddAssign<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::AddAssign<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn add_assign(&mut self, rhs: N) {
         self.coefficients[0] += rhs;
     }
 }
 
-impl<N: ComplexField> ops::AddAssign<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::AddAssign<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn add_assign(&mut self, rhs: Polynomial<N>) {
         let min_order = self.coefficients.len().min(rhs.coefficients.len());
         for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
@@ -647,7 +686,10 @@ impl<N: ComplexField> ops::AddAssign<Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::AddAssign<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::AddAssign<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn add_assign(&mut self, rhs: &Polynomial<N>) {
         let min_order = self.coefficients.len().min(rhs.coefficients.len());
         for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
@@ -660,7 +702,10 @@ impl<N: ComplexField> ops::AddAssign<&Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(mut self, rhs: N) -> Polynomial<N> {
@@ -669,7 +714,10 @@ impl<N: ComplexField> ops::Sub<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<N> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<N> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(self, rhs: N) -> Polynomial<N> {
@@ -682,7 +730,10 @@ impl<N: ComplexField> ops::Sub<N> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(mut self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -699,7 +750,10 @@ impl<N: ComplexField> ops::Sub<Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -726,7 +780,10 @@ impl<N: ComplexField> ops::Sub<Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(mut self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -743,7 +800,10 @@ impl<N: ComplexField> ops::Sub<&Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Sub<&Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Sub<&Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn sub(self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -770,13 +830,19 @@ impl<N: ComplexField> ops::Sub<&Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::SubAssign<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::SubAssign<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn sub_assign(&mut self, rhs: N) {
         self.coefficients[0] -= rhs;
     }
 }
 
-impl<N: ComplexField> ops::SubAssign<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::SubAssign<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn sub_assign(&mut self, rhs: Polynomial<N>) {
         let min_order = self.coefficients.len().min(rhs.coefficients.len());
         for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
@@ -789,7 +855,10 @@ impl<N: ComplexField> ops::SubAssign<Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::SubAssign<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::SubAssign<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn sub_assign(&mut self, rhs: &Polynomial<N>) {
         let min_order = self.coefficients.len().min(rhs.coefficients.len());
         for (ind, val) in self.coefficients.iter_mut().take(min_order).enumerate() {
@@ -802,7 +871,10 @@ impl<N: ComplexField> ops::SubAssign<&Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Mul<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(mut self, rhs: N) -> Polynomial<N> {
@@ -813,7 +885,10 @@ impl<N: ComplexField> ops::Mul<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Mul<N> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<N> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: N) -> Polynomial<N> {
@@ -828,7 +903,13 @@ impl<N: ComplexField> ops::Mul<N> for &Polynomial<N> {
     }
 }
 
-fn multiply<N: ComplexField>(lhs: &Polynomial<N>, rhs: &Polynomial<N>) -> Polynomial<N> {
+fn multiply<N: ComplexField + FromPrimitive + Copy>(
+    lhs: &Polynomial<N>,
+    rhs: &Polynomial<N>,
+) -> Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     // Do scalar multiplication if one side has no powers
     if rhs.coefficients.len() == 1 {
         return lhs * rhs.coefficients[0];
@@ -860,7 +941,10 @@ fn multiply<N: ComplexField>(lhs: &Polynomial<N>, rhs: &Polynomial<N>) -> Polyno
     Polynomial::<N>::idft(&product_points, lhs.tolerance)
 }
 
-impl<N: ComplexField> ops::Mul<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -868,7 +952,10 @@ impl<N: ComplexField> ops::Mul<Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Mul<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -876,7 +963,10 @@ impl<N: ComplexField> ops::Mul<&Polynomial<N>> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Mul<Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
@@ -884,7 +974,10 @@ impl<N: ComplexField> ops::Mul<Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Mul<&Polynomial<N>> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Mul<&Polynomial<N>> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
@@ -892,7 +985,10 @@ impl<N: ComplexField> ops::Mul<&Polynomial<N>> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::MulAssign<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::MulAssign<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn mul_assign(&mut self, rhs: N) {
         for val in self.coefficients.iter_mut() {
             *val *= rhs;
@@ -900,19 +996,28 @@ impl<N: ComplexField> ops::MulAssign<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::MulAssign<Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::MulAssign<Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn mul_assign(&mut self, rhs: Polynomial<N>) {
         self.coefficients = multiply(&self, &rhs).coefficients;
     }
 }
 
-impl<N: ComplexField> ops::MulAssign<&Polynomial<N>> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::MulAssign<&Polynomial<N>> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn mul_assign(&mut self, rhs: &Polynomial<N>) {
         self.coefficients = multiply(&self, &rhs).coefficients;
     }
 }
 
-impl<N: ComplexField> ops::Div<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Div<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn div(mut self, rhs: N) -> Polynomial<N> {
@@ -923,7 +1028,10 @@ impl<N: ComplexField> ops::Div<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Div<N> for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Div<N> for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn div(self, rhs: N) -> Polynomial<N> {
@@ -938,7 +1046,10 @@ impl<N: ComplexField> ops::Div<N> for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::DivAssign<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::DivAssign<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn div_assign(&mut self, rhs: N) {
         for val in &mut self.coefficients {
             *val /= rhs;
@@ -946,7 +1057,10 @@ impl<N: ComplexField> ops::DivAssign<N> for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Neg for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Neg for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn neg(mut self) -> Polynomial<N> {
@@ -957,7 +1071,10 @@ impl<N: ComplexField> ops::Neg for Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> ops::Neg for &Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> ops::Neg for &Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     type Output = Polynomial<N>;
 
     fn neg(self) -> Polynomial<N> {
@@ -968,13 +1085,16 @@ impl<N: ComplexField> ops::Neg for &Polynomial<N> {
     }
 }
 
-impl<N: ComplexField> From<N> for Polynomial<N> {
+impl<N: ComplexField + FromPrimitive + Copy> From<N> for Polynomial<N>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     fn from(n: N) -> Polynomial<N> {
         polynomial![n]
     }
 }
 
-impl<N: RealField> From<Polynomial<N>> for Polynomial<Complex<N>> {
+impl<N: RealField + FromPrimitive + Copy> From<Polynomial<N>> for Polynomial<Complex<N>> {
     fn from(poly: Polynomial<N>) -> Polynomial<Complex<N>> {
         poly.make_complex()
     }

@@ -8,7 +8,7 @@ use nalgebra::{
     allocator::Allocator, dimension::DimMin, ComplexField, DefaultAllocator, DimName, VectorN, U1,
     U6, U7,
 };
-use num_traits::Zero;
+use num_traits::{FromPrimitive, Zero};
 
 mod adams;
 mod bdf;
@@ -146,9 +146,10 @@ where
     }
 }
 
-impl<N: ComplexField, S: DimName> IVPSolver<N, S> for Euler<N, S>
+impl<N: ComplexField + Copy, S: DimName> IVPSolver<N, S> for Euler<N, S>
 where
     DefaultAllocator: Allocator<N, S>,
+    <N as ComplexField>::RealField: Copy,
 {
     fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
         &mut self,
@@ -293,7 +294,8 @@ pub fn solve_ivp<N, S, T, F>(
     params: &mut T,
 ) -> Path<N, N::RealField, S>
 where
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
     S: DimName + DimMin<S, Output = S>,
     T: Clone,
     F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,

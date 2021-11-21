@@ -6,6 +6,7 @@
 
 use super::polynomial::Polynomial;
 use nalgebra::ComplexField;
+use num_traits::FromPrimitive;
 
 mod spline;
 pub use spline::*;
@@ -29,11 +30,14 @@ pub use spline::*;
 ///     }
 /// }
 /// ```
-pub fn lagrange<N: ComplexField>(
+pub fn lagrange<N: ComplexField + FromPrimitive + Copy>(
     xs: &[N],
     ys: &[N],
     tol: N::RealField,
-) -> Result<Polynomial<N>, String> {
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if xs.len() != ys.len() {
         return Err("lagrange: slices have mismatched dimension".to_owned());
     }
@@ -66,12 +70,15 @@ pub fn lagrange<N: ComplexField>(
     Ok(qs[xs.len() * xs.len() - 1].clone())
 }
 
-pub fn hermite<N: ComplexField>(
+pub fn hermite<N: ComplexField + FromPrimitive + Copy>(
     xs: &[N],
     ys: &[N],
     derivs: &[N],
     tol: N::RealField,
-) -> Result<Polynomial<N>, String> {
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if xs.len() != ys.len() {
         return Err("hermite: slices have mismatched dimension".to_owned());
     }

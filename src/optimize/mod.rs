@@ -6,7 +6,13 @@ use nalgebra::{
 use num_traits::{FromPrimitive, One, Zero};
 
 /// Linear least-squares regression
-pub fn linear_fit<N: ComplexField>(xs: &[N], ys: &[N]) -> Result<Polynomial<N>, String> {
+pub fn linear_fit<N: ComplexField + FromPrimitive + Copy>(
+    xs: &[N],
+    ys: &[N],
+) -> Result<Polynomial<N>, String>
+where
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
     if xs.len() != ys.len() {
         return Err("linear_fit: xs length does not match ys length".to_owned());
     }
@@ -34,7 +40,11 @@ pub fn linear_fit<N: ComplexField>(xs: &[N], ys: &[N]) -> Result<Polynomial<N>, 
 }
 
 // Compute the J matrix for LM using finite differences, 3 point formula
-fn jac_finite_differences<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> N>(
+fn jac_finite_differences<
+    N: ComplexField + FromPrimitive + Copy,
+    V: DimName,
+    F: FnMut(N, &VectorN<N, V>) -> N,
+>(
     mut f: F,
     xs: &[N],
     params: &mut VectorN<N, V>,
@@ -42,6 +52,7 @@ fn jac_finite_differences<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V
     h: N::RealField,
 ) where
     DefaultAllocator: Allocator<N, V>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     let h = N::from_real(h);
     let denom = N::one() / (N::from_i32(2).unwrap() * h);
@@ -59,7 +70,7 @@ fn jac_finite_differences<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V
 }
 
 // Compute the J matrix for LM using analytic formula
-fn jac_analytic<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> VectorN<N, V>>(
+fn jac_analytic<N: ComplexField + Copy, V: DimName, F: FnMut(N, &VectorN<N, V>) -> VectorN<N, V>>(
     mut jac: F,
     xs: &[N],
     params: &mut VectorN<N, V>,
@@ -83,13 +94,13 @@ pub struct CurveFitParams<N: ComplexField> {
     pub damping_mult: N::RealField,
 }
 
-impl<N: ComplexField> Default for CurveFitParams<N> {
+impl<N: ComplexField + FromPrimitive> Default for CurveFitParams<N> {
     fn default() -> Self {
         CurveFitParams {
-            damping: N::RealField::from_f64(2.0).unwrap(),
-            tolerance: N::RealField::from_f64(1e-5).unwrap(),
-            h: N::RealField::from_f64(0.1).unwrap(),
-            damping_mult: N::RealField::from_f64(1.5).unwrap(),
+            damping: N::from_f64(2.0).unwrap().real(),
+            tolerance: N::from_f64(1e-5).unwrap().real(),
+            h: N::from_f64(0.1).unwrap().real(),
+            damping_mult: N::from_f64(1.5).unwrap().real(),
         }
     }
 }
@@ -100,7 +111,11 @@ impl<N: ComplexField> Default for CurveFitParams<N> {
 /// can be found analytically, then use curve_fit_jac. Keeps iterating until
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol.
-pub fn curve_fit<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> N>(
+pub fn curve_fit<
+    N: ComplexField + FromPrimitive + Copy,
+    V: DimName,
+    F: FnMut(N, &VectorN<N, V>) -> N,
+>(
     mut f: F,
     xs: &[N],
     ys: &[N],
@@ -109,6 +124,7 @@ pub fn curve_fit<N: ComplexField, V: DimName, F: FnMut(N, &VectorN<N, V>) -> N>(
 ) -> Result<VectorN<N, V>, String>
 where
     DefaultAllocator: Allocator<N, V>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     let tol = params.tolerance;
     let mut damping = params.damping;
@@ -183,7 +199,7 @@ where
     }
 
     let mut last_sum_sq = sum_sq;
-    sum_sq += N::RealField::from_i32(2).unwrap() * tol;
+    sum_sq += N::from_i32(2).unwrap().real() * tol;
     while (last_sum_sq - sum_sq).abs() > tol {
         last_sum_sq = sum_sq;
         // Get right side of iteration equation
@@ -263,7 +279,7 @@ where
 /// is under tol. Jacobian should be a function that returns a column vector
 /// where jacobian[i] is the partial derivative of f with respect to param[i].
 pub fn curve_fit_jac<
-    N: ComplexField,
+    N: ComplexField + FromPrimitive + Copy,
     V: DimName,
     F: FnMut(N, &VectorN<N, V>) -> N,
     G: FnMut(N, &VectorN<N, V>) -> VectorN<N, V>,
@@ -277,6 +293,7 @@ pub fn curve_fit_jac<
 ) -> Result<VectorN<N, V>, String>
 where
     DefaultAllocator: Allocator<N, V>,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     let tol = params.tolerance;
     let mut damping = params.damping;
@@ -354,7 +371,7 @@ where
     }
 
     let mut last_sum_sq = sum_sq;
-    sum_sq += N::RealField::from_i32(2).unwrap() * tol;
+    sum_sq += N::from_i32(2).unwrap().real() * tol;
     while (last_sum_sq - sum_sq).abs() > tol {
         last_sum_sq = sum_sq;
         // Get right side of iteration equation
