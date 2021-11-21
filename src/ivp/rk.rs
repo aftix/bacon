@@ -335,10 +335,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{SVector, U1};
+/// use nalgebra::SVector;
 /// use bacon_sci::ivp::{RK45, RungeKuttaSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, U1>, String> {
-///     Ok(SVector::<f64, U1>::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, String> {
+///     Ok(SVector::<f64, 1>::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), String> {
@@ -548,10 +548,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{SVector, U1};
+/// use nalgebra::SVector;
 /// use bacon_sci::ivp::{RK23, RungeKuttaSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, U1>, String> {
-///     Ok(SVector::<f64, U1>::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, String> {
+///     Ok(SVector::<f64, 1>::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), String> {

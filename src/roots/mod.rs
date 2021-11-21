@@ -166,14 +166,14 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1, MatrixN};
+/// use nalgebra::{SVector, SMatrix};
 /// use bacon_sci::roots::newton;
-/// fn cubic(x: &[f64]) -> VectorN<f64, U1> {
-///   VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.powi(3)))
+/// fn cubic(x: &[f64]) -> SVector<f64, 1> {
+///   SVector::<f64, 1>::from_iterator(x.iter().map(|x| x.powi(3)))
 /// }
 ///
-/// fn cubic_deriv(x: &[f64]) -> MatrixN<f64, U1> {
-///  MatrixN::<f64, U1>::from_iterator(x.iter().map(|x| 3.0*x.powi(2)))
+/// fn cubic_deriv(x: &[f64]) -> SMatrix<f64, 1, 1> {
+///  SMatrix::<f64, 1, 1>::from_iterator(x.iter().map(|x| 3.0*x.powi(2)))
 /// }
 /// //...
 /// fn example() {
@@ -276,10 +276,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::SVector;
 /// use bacon_sci::roots::secant;
-/// fn cubic(x: &[f64]) -> VectorN<f64, U1> {
-///   VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.powi(3)))
+/// fn cubic(x: &[f64]) -> SVector<f64, 1> {
+///   SVector::<f64, 1>::from_iterator(x.iter().map(|x| x.powi(3)))
 /// }
 /// //...
 /// fn example() {

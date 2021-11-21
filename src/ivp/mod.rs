@@ -96,10 +96,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::SVector;
 /// use bacon_sci::ivp::{Euler, IVPSolver};
-/// fn derivative(_t: f64, state: &[f64], _p: &mut ()) -> Result<VectorN<f64, U1>, String> {
-///     Ok(VectorN::<f64, U1>::from_column_slice(state))
+/// fn derivative(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, String> {
+///     Ok(SVector::<f64, 1>::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), String> {
@@ -265,10 +265,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::SVector;
 /// use bacon_sci::ivp::solve_ivp;
-/// fn derivatives(_: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
-///     Ok(-VectorN::<f64, U1>::from_column_slice(y))
+/// fn derivatives(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, String> {
+///     Ok(-SVector::<f64, 1>::from_column_slice(y))
 /// }
 ///
 /// fn example() -> Result<(), String> {

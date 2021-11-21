@@ -22,10 +22,10 @@ method.
 
 ```rust
 use bacon_sci::ivp::{RK45, RungeKuttaSolver};
-use nalgebra::{VectorN, U1};
+use nalgebra::SVector;
 
-fn deriv(_t: f64, y: &[f64], _params: &mut ()) -> Result<VectorN<f64, U1>, String> {
-    Ok(VectorN::<f64, U1>::from_column_slice(y))
+fn deriv(_t: f64, y: &[f64], _params: &mut ()) -> Result<SVector<f64, 1>, String> {
+    Ok(SVector::<f64, 1>::from_column_slice(y))
 }
 
 fn solve() -> Result<(), String> {
@@ -57,10 +57,10 @@ initial guesses of `0.1` and `-0.1`.
 
 ```rust
 use bacon_sci::roots::secant;
-use nalgebra::{VectorN, U1};
+use nalgebra::SVector;
 
-fn cubic(x: &[f64]) -> VectorN<f64, U1> {
-    VectorN::<f64, U1>::from_iterator(x.iter.map(|x| x.powi(3)))
+fn cubic(x: &[f64]) -> SVector<f64, 1> {
+    SVector::<f64, 1>::from_iterator(x.iter.map(|x| x.powi(3)))
 }
 
 fn solve() -> f64 {
