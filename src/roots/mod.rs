@@ -4,11 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{
-    allocator::Allocator,
-    dimension::{DimMin, DimMinimum},
-    ComplexField, DefaultAllocator, DimName, MatrixN, RealField, VectorN, U1,
-};
+use nalgebra::{ComplexField, Const, DimMin, RealField, SMatrix, SVector};
 use num_traits::{FromPrimitive, Zero};
 
 mod polynomial;
@@ -44,12 +40,16 @@ pub use polynomial::*;
 ///   let solution = bisection((-1.0, 1.0), cubic, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn bisection<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
+pub fn bisection<N, F>(
     (mut left, mut right): (N, N),
     mut f: F,
     tol: N,
     n_max: usize,
-) -> Result<N, String> {
+) -> Result<N, String>
+where
+    N: RealField + FromPrimitive + Copy,
+    F: FnMut(N) -> N,
+{
     if left >= right {
         return Err("Bisection: requirement: right > left".to_owned());
     }
@@ -122,19 +122,17 @@ pub fn bisection<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
 ///   let solution = steffensen(0.5f64, cosine, 0.0001, 1000)?;
 ///   Ok(())
 /// }
-pub fn steffensen<N: RealField + From<f64> + Copy>(
-    mut initial: N,
-    f: fn(N) -> N,
-    tol: N,
-    n_max: usize,
-) -> Result<N, String> {
+pub fn steffensen<N>(mut initial: N, f: fn(N) -> N, tol: N, n_max: usize) -> Result<N, String>
+where
+    N: RealField + FromPrimitive + Copy,
+{
     let mut n = 0;
 
     while n < n_max {
         let guess = f(initial);
         let new_guess = f(guess);
-        let diff =
-            initial - (guess - initial).powi(2) / (new_guess - N::from(2.0) * guess + initial);
+        let diff = initial
+            - (guess - initial).powi(2) / (new_guess - N::from_f64(2.0).unwrap() * guess + initial);
         if (diff - initial).abs() <= tol {
             return Ok(diff);
         }
@@ -182,25 +180,21 @@ pub fn steffensen<N: RealField + From<f64> + Copy>(
 ///   let solution = newton(&[0.1], cubic, cubic_deriv, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn newton<N, S, F, G>(
+pub fn newton<N, F, G, const S: usize>(
     initial: &[N],
     mut f: F,
     mut jac: G,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<VectorN<N, S>, String>
+) -> Result<SVector<N, S>, String>
 where
     N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
-    S: DimName + DimMin<S, Output = S>,
-    F: FnMut(&[N]) -> VectorN<N, S>,
-    G: FnMut(&[N]) -> MatrixN<N, S>,
-    DefaultAllocator: Allocator<N, S>
-        + Allocator<N, S, S>
-        + Allocator<(usize, usize), DimMinimum<S, S>>
-        + Allocator<(usize, usize), S>,
+    F: FnMut(&[N]) -> SVector<N, S>,
+    G: FnMut(&[N]) -> SMatrix<N, S, S>,
+    Const<S>: DimMin<Const<S>, Output = Const<S>>,
 {
-    let mut guess = VectorN::<N, S>::from_column_slice(initial);
+    let mut guess = SVector::<N, S>::from_column_slice(initial);
     let mut norm = guess.dot(&guess).sqrt().abs();
     let mut n = 0;
 
@@ -231,19 +225,17 @@ where
     Err("Newton: Maximum iterations exceeded".to_owned())
 }
 
-fn jac_finite_diff<N, S, F>(
+fn jac_finite_diff<N, F, const S: usize>(
     mut f: F,
-    x: &mut VectorN<N, S>,
+    x: &mut SVector<N, S>,
     h: <N as ComplexField>::RealField,
-) -> MatrixN<N, S>
+) -> SMatrix<N, S, S>
 where
     N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
-    S: DimName,
-    F: FnMut(&[N]) -> VectorN<N, S>,
-    DefaultAllocator: Allocator<N, S> + Allocator<N, S, S>,
+    F: FnMut(&[N]) -> SVector<N, S>,
 {
-    let mut mat = MatrixN::<N, S>::zero();
+    let mut mat = SMatrix::<N, S, S>::zero();
     let h = N::from_real(h);
     let denom = N::one() / (N::from_i32(2).unwrap() * h);
 
@@ -294,24 +286,22 @@ where
 ///   let solution = secant(&[0.1], cubic, 0.1, 0.001, 1000).unwrap();
 /// }
 /// ```
-pub fn secant<N, S, F>(
+pub fn secant<N, F, const S: usize>(
     initial: &[N],
     mut func: F,
     h: <N as ComplexField>::RealField,
     tol: <N as ComplexField>::RealField,
     n_max: usize,
-) -> Result<VectorN<N, S>, String>
+) -> Result<SVector<N, S>, String>
 where
     N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
-    S: DimName + DimMin<S, Output = S>,
-    F: FnMut(&[N]) -> VectorN<N, S>,
-    DefaultAllocator:
-        Allocator<N, S> + Allocator<N, S, S> + Allocator<(usize, usize), S> + Allocator<N, U1, S>,
+    F: FnMut(&[N]) -> SVector<N, S>,
+    Const<S>: DimMin<Const<S>, Output = Const<S>>,
 {
     let mut n = 2;
 
-    let mut guess = VectorN::<N, S>::from_column_slice(initial);
+    let mut guess = SVector::<N, S>::from_column_slice(initial);
     let mut func_eval = func(guess.as_slice());
 
     let jac = jac_finite_diff(&mut func, &mut guess, h);
@@ -362,11 +352,11 @@ where
 ///   let solution = brent((0.1, -0.1), cubic, 1e-5).unwrap();
 /// }
 /// ```
-pub fn brent<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
-    initial: (N, N),
-    mut f: F,
-    tol: N,
-) -> Result<N, String> {
+pub fn brent<N, F>(initial: (N, N), mut f: F, tol: N) -> Result<N, String>
+where
+    N: RealField + FromPrimitive + Copy,
+    F: FnMut(N) -> N,
+{
     if !tol.is_sign_positive() {
         return Err("brent: tolerance must be positive".to_owned());
     }
@@ -464,14 +454,11 @@ pub fn brent<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
 ///   let solution = itp((0.1, -0.1), cubic, 0.1, 2.0, 0.99, 1e-5).unwrap();
 /// }
 /// ```
-pub fn itp<N: RealField + FromPrimitive + Copy, F: FnMut(N) -> N>(
-    initial: (N, N),
-    mut f: F,
-    k_1: N,
-    k_2: N,
-    n_0: N,
-    tol: N,
-) -> Result<N, String> {
+pub fn itp<N, F>(initial: (N, N), mut f: F, k_1: N, k_2: N, n_0: N, tol: N) -> Result<N, String>
+where
+    N: RealField + FromPrimitive + Copy,
+    F: FnMut(N) -> N,
+{
     if !tol.is_sign_positive() {
         return Err("itp: tolerance must be positive".to_owned());
     }

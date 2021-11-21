@@ -1,16 +1,11 @@
 use crate::polynomial::Polynomial;
-use nalgebra::{
-    allocator::Allocator, ComplexField, DMatrix, DVector, DefaultAllocator, DimName, RealField,
-    VectorN,
-};
+use nalgebra::{ComplexField, DMatrix, DVector, RealField, SVector};
 use num_traits::{FromPrimitive, One, Zero};
 
 /// Linear least-squares regression
-pub fn linear_fit<N: ComplexField + FromPrimitive + Copy>(
-    xs: &[N],
-    ys: &[N],
-) -> Result<Polynomial<N>, String>
+pub fn linear_fit<N>(xs: &[N], ys: &[N]) -> Result<Polynomial<N>, String>
 where
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     if xs.len() != ys.len() {
@@ -40,18 +35,15 @@ where
 }
 
 // Compute the J matrix for LM using finite differences, 3 point formula
-fn jac_finite_differences<
-    N: ComplexField + FromPrimitive + Copy,
-    V: DimName,
-    F: FnMut(N, &VectorN<N, V>) -> N,
->(
+fn jac_finite_differences<N, F, const V: usize>(
     mut f: F,
     xs: &[N],
-    params: &mut VectorN<N, V>,
+    params: &mut SVector<N, V>,
     mat: &mut DMatrix<N>,
     h: N::RealField,
 ) where
-    DefaultAllocator: Allocator<N, V>,
+    N: ComplexField + FromPrimitive + Copy,
+    F: FnMut(N, &SVector<N, V>) -> N,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     let h = N::from_real(h);
@@ -70,13 +62,14 @@ fn jac_finite_differences<
 }
 
 // Compute the J matrix for LM using analytic formula
-fn jac_analytic<N: ComplexField + Copy, V: DimName, F: FnMut(N, &VectorN<N, V>) -> VectorN<N, V>>(
+fn jac_analytic<N, F, const V: usize>(
     mut jac: F,
     xs: &[N],
-    params: &mut VectorN<N, V>,
+    params: &mut SVector<N, V>,
     mat: &mut DMatrix<N>,
 ) where
-    DefaultAllocator: Allocator<N, V>,
+    N: ComplexField + Copy,
+    F: FnMut(N, &SVector<N, V>) -> SVector<N, V>,
 {
     for row in 0..mat.column(0).len() {
         let deriv = jac(xs[row], &params);
@@ -111,20 +104,17 @@ impl<N: ComplexField + FromPrimitive> Default for CurveFitParams<N> {
 /// can be found analytically, then use curve_fit_jac. Keeps iterating until
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol.
-pub fn curve_fit<
-    N: ComplexField + FromPrimitive + Copy,
-    V: DimName,
-    F: FnMut(N, &VectorN<N, V>) -> N,
->(
+pub fn curve_fit<N, F, const V: usize>(
     mut f: F,
     xs: &[N],
     ys: &[N],
     initial: &[N],
     params: &CurveFitParams<N>,
-) -> Result<VectorN<N, V>, String>
+) -> Result<SVector<N, V>, String>
 where
-    DefaultAllocator: Allocator<N, V>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
+    F: FnMut(N, &SVector<N, V>) -> N,
 {
     let tol = params.tolerance;
     let mut damping = params.damping;
@@ -147,7 +137,7 @@ where
         return Err("curve_fit: xs length must match ys length".to_owned());
     }
 
-    let mut params = VectorN::<N, V>::from_column_slice(initial);
+    let mut params = SVector::<N, V>::from_column_slice(initial);
     let ys = DVector::<N>::from_column_slice(ys);
     let mut jac: DMatrix<N> = DMatrix::identity(xs.len(), params.len());
     jac_finite_differences(&mut f, xs, &mut params, &mut jac, h);
@@ -278,22 +268,19 @@ where
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol. Jacobian should be a function that returns a column vector
 /// where jacobian[i] is the partial derivative of f with respect to param[i].
-pub fn curve_fit_jac<
-    N: ComplexField + FromPrimitive + Copy,
-    V: DimName,
-    F: FnMut(N, &VectorN<N, V>) -> N,
-    G: FnMut(N, &VectorN<N, V>) -> VectorN<N, V>,
->(
+pub fn curve_fit_jac<N, F, G, const V: usize>(
     mut f: F,
     xs: &[N],
     ys: &[N],
     initial: &[N],
     mut jacobian: G,
     params: &CurveFitParams<N>,
-) -> Result<VectorN<N, V>, String>
+) -> Result<SVector<N, V>, String>
 where
-    DefaultAllocator: Allocator<N, V>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
+    F: FnMut(N, &SVector<N, V>) -> N,
+    G: FnMut(N, &SVector<N, V>) -> SVector<N, V>,
 {
     let tol = params.tolerance;
     let mut damping = params.damping;
@@ -311,7 +298,7 @@ where
         return Err("curve_fit_jac: xs length must match ys length".to_owned());
     }
 
-    let mut params = VectorN::<N, V>::from_column_slice(initial);
+    let mut params = SVector::<N, V>::from_column_slice(initial);
     let ys = DVector::<N>::from_column_slice(ys);
     let mut jac: DMatrix<N> = DMatrix::identity(xs.len(), params.len());
     jac_analytic(&mut jacobian, xs, &mut params, &mut jac);

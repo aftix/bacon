@@ -4,10 +4,7 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{
-    allocator::Allocator, dimension::DimMin, ComplexField, DefaultAllocator, DimName, VectorN, U1,
-    U6, U7,
-};
+use nalgebra::{ComplexField, Const, DimMin, SVector};
 use num_traits::{FromPrimitive, Zero};
 
 mod adams;
@@ -18,30 +15,29 @@ pub use bdf::*;
 pub use rk::*;
 
 /// Status of an IVP Solver after a step
-pub enum IVPStatus<N: ComplexField, S: DimName>
+pub enum IVPStatus<N, const S: usize>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
 {
     Redo,
-    Ok(Vec<(N::RealField, VectorN<N, S>)>),
+    Ok(Vec<(N::RealField, SVector<N, S>)>),
     Done,
 }
 
-type Path<Complex, Real, S> = Result<Vec<(Real, VectorN<Complex, S>)>, String>;
+type Path<Complex, Real, const S: usize> = Result<Vec<(Real, SVector<Complex, S>)>, String>;
 
 /// Trait defining what it means to be an IVP solver.
 /// solve_ivp is automatically implemented based on your step implementation.
-pub trait IVPSolver<N: ComplexField, S: DimName>: Sized
+pub trait IVPSolver<N, const S: usize>: Sized
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
 {
     /// Step forward in the solver. Returns if the solver is finished, produced
     /// an acceptable state, or needs to be redone.
-    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
-        &mut self,
-        f: F,
-        params: &mut T,
-    ) -> Result<IVPStatus<N, S>, String>;
+    fn step<T, F>(&mut self, f: F, params: &mut T) -> Result<IVPStatus<N, S>, String>
+    where
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>;
     /// Set the error tolerance for this solver.
     fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
     /// Set the maximum time step for this solver.
@@ -59,7 +55,7 @@ where
 
     /// Return the initial conditions. Called once at the very start
     /// of solving.
-    fn get_initial_conditions(&self) -> Option<VectorN<N, S>>;
+    fn get_initial_conditions(&self) -> Option<SVector<N, S>>;
     /// Get the current time of the solver.
     fn get_time(&self) -> Option<N::RealField>;
     /// Make sure that every value that needs to be set
@@ -69,7 +65,7 @@ where
     /// Solve an initial value problem, consuming the solver
     fn solve_ivp<
         T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
     >(
         mut self,
         mut f: F,
@@ -122,19 +118,19 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct Euler<N: ComplexField, S: DimName>
+pub struct Euler<N, const S: usize>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
 {
     dt: Option<N::RealField>,
     time: Option<N::RealField>,
     end: Option<N::RealField>,
-    state: Option<VectorN<N, S>>,
+    state: Option<SVector<N, S>>,
 }
 
-impl<N: ComplexField, S: DimName> Euler<N, S>
+impl<N, const S: usize> Euler<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField,
 {
     pub fn new() -> Self {
         Euler {
@@ -146,16 +142,16 @@ where
     }
 }
 
-impl<N: ComplexField + Copy, S: DimName> IVPSolver<N, S> for Euler<N, S>
+impl<N, const S: usize> IVPSolver<N, S> for Euler<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField + Copy,
     <N as ComplexField>::RealField: Copy,
 {
-    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
-        &mut self,
-        mut f: F,
-        params: &mut T,
-    ) -> Result<IVPStatus<N, S>, String> {
+    fn step<T, F>(&mut self, mut f: F, params: &mut T) -> Result<IVPStatus<N, S>, String>
+    where
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
+    {
         if self.time >= self.end {
             return Ok(IVPStatus::Done);
         }
@@ -169,7 +165,7 @@ where
             params,
         )?;
 
-        *self.state.get_or_insert(VectorN::from_iterator(
+        *self.state.get_or_insert(SVector::from_iterator(
             [N::zero()].repeat(self.state.as_ref().unwrap().as_slice().len()),
         )) += deriv * N::from_real(self.dt.unwrap());
         *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
@@ -213,7 +209,7 @@ where
     }
 
     fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.state = Some(VectorN::from_column_slice(start));
+        self.state = Some(SVector::from_column_slice(start));
         Ok(self)
     }
 
@@ -221,7 +217,7 @@ where
         self
     }
 
-    fn get_initial_conditions(&self) -> Option<VectorN<N, S>> {
+    fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
         if let Some(state) = &self.state {
             Some(state.clone())
         } else {
@@ -285,7 +281,7 @@ where
 ///     Ok(())
 /// }
 /// ```
-pub fn solve_ivp<N, S, T, F>(
+pub fn solve_ivp<N, T, F, const S: usize>(
     (start, end): (N::RealField, N::RealField),
     (dt_max, dt_min): (N::RealField, N::RealField),
     y_0: &[N],
@@ -296,19 +292,9 @@ pub fn solve_ivp<N, S, T, F>(
 where
     N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
-    S: DimName + DimMin<S, Output = S>,
     T: Clone,
-    F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
-    DefaultAllocator: Allocator<N, S>
-        + Allocator<N, U6>
-        + Allocator<N, S, U6>
-        + Allocator<N, U6, U6>
-        + Allocator<N::RealField, U6>
-        + Allocator<N::RealField, U6, U6>
-        + Allocator<N, U7>
-        + Allocator<N, S, S>
-        + Allocator<N, U1, S>
-        + Allocator<(usize, usize), S>,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
+    Const<S>: DimMin<Const<S>, Output = Const<S>>,
 {
     let solver = Adams::new()
         .with_start(start)?

@@ -17,9 +17,10 @@ rand="0.8"
 
 [dependencies]
 nalgebra="=0.29.0"
+typenum="=1.14"
 num-complex="=0.4.0"
 num-traits="=0.2.14"
-phf = "0.8"
+phf = "=0.8"
 
 [build-dependencies]
 phf_codegen = "0.8"

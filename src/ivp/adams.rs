@@ -5,9 +5,7 @@
  */
 
 use super::{IVPSolver, IVPStatus};
-use nalgebra::{
-    allocator::Allocator, ComplexField, DefaultAllocator, DimName, RealField, VectorN, U3, U5,
-};
+use nalgebra::{ComplexField, RealField, SVector};
 use num_traits::{FromPrimitive, Zero};
 use std::collections::VecDeque;
 
@@ -18,27 +16,25 @@ use std::collections::VecDeque;
 ///
 /// # Examples
 /// See `struct Adams` for an example of implementing this trait
-pub trait AdamsSolver<N: ComplexField, S: DimName, O: DimName>: Sized
+pub trait AdamsSolver<N, const S: usize, const O: usize>: Sized
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, O>,
+    N: ComplexField,
 {
     /// The polynomial interpolation coefficients for the predictor. Should start
     /// with the coefficient for n - 1
-    fn predictor_coefficients() -> VectorN<N::RealField, O>;
+    fn predictor_coefficients() -> SVector<N::RealField, O>;
     /// The polynomial interpolation coefficients for the corrector. Must be
     /// the same length as predictor_coefficients. Should start with the
     /// implicit coefficient.
-    fn corrector_coefficients() -> VectorN<N::RealField, O>;
+    fn corrector_coefficients() -> SVector<N::RealField, O>;
     /// Coefficient for multiplying error by.
     fn error_coefficient() -> N::RealField;
 
     /// Use AdamsInfo to solve an initial value problem
-    fn solve_ivp<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
-        self,
-        f: F,
-        params: &mut T,
-    ) -> super::Path<N, N::RealField, S>;
+    fn solve_ivp<T, F>(self, f: F, params: &mut T) -> super::Path<N, N::RealField, S>
+    where
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>;
 
     /// Set the error tolerance for this solver.
     fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
@@ -60,32 +56,30 @@ where
 /// the predictor and correctorr coefficients. It is up to the AdamsSolver
 /// to set up AdamsInfo with the correct coefficients.
 #[derive(Debug, Clone)]
-pub struct AdamsInfo<N: ComplexField + FromPrimitive + Copy, S: DimName, O: DimName>
+pub struct AdamsInfo<N, const S: usize, const O: usize>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, O>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     dt: Option<N::RealField>,
     time: Option<N::RealField>,
     end: Option<N::RealField>,
-    state: Option<VectorN<N, S>>,
+    state: Option<SVector<N, S>>,
     dt_max: Option<N::RealField>,
     dt_min: Option<N::RealField>,
     tolerance: Option<N::RealField>,
-    predictor_coefficients: VectorN<N, O>,
-    corrector_coefficients: VectorN<N, O>,
+    predictor_coefficients: SVector<N, O>,
+    corrector_coefficients: SVector<N, O>,
     error_coefficient: N::RealField,
-    memory: VecDeque<VectorN<N, S>>,
-    states: VecDeque<(N::RealField, VectorN<N, S>)>,
+    memory: VecDeque<SVector<N, S>>,
+    states: VecDeque<(N::RealField, SVector<N, S>)>,
     nflag: bool,
     last: bool,
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName, O: DimName> AdamsInfo<N, S, O>
+impl<N, const S: usize, const O: usize> AdamsInfo<N, S, O>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, O>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     pub fn new() -> Self {
@@ -97,8 +91,8 @@ where
             dt_max: None,
             dt_min: None,
             tolerance: None,
-            predictor_coefficients: VectorN::<N, O>::zero(),
-            corrector_coefficients: VectorN::<N, O>::zero(),
+            predictor_coefficients: SVector::<N, O>::zero(),
+            corrector_coefficients: SVector::<N, O>::zero(),
             error_coefficient: N::RealField::zero(),
             memory: VecDeque::new(),
             states: VecDeque::new(),
@@ -109,26 +103,23 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn rk4<
-    N: ComplexField + FromPrimitive + Copy,
-    S: DimName,
-    T: Clone,
-    F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
->(
+fn rk4<N, T, F, const S: usize>(
     time: N::RealField,
     dt: N::RealField,
     initial: &[N],
-    states: &mut VecDeque<(N::RealField, VectorN<N, S>)>,
-    derivs: &mut VecDeque<VectorN<N, S>>,
+    states: &mut VecDeque<(N::RealField, SVector<N, S>)>,
+    derivs: &mut VecDeque<SVector<N, S>>,
     mut f: F,
     params: &mut T,
     num: usize,
 ) -> Result<(), String>
 where
-    DefaultAllocator: Allocator<N, S>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
+    T: Clone,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
 {
-    let mut state = VectorN::from_column_slice(initial);
+    let mut state: SVector<N, S> = SVector::from_column_slice(initial);
     let mut time = time;
     for i in 0..num {
         let k1 = f(time, state.as_slice(), &mut params.clone())? * N::from_real(dt);
@@ -160,10 +151,9 @@ where
     Ok(())
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName, O: DimName> Default for AdamsInfo<N, S, O>
+impl<N, const S: usize, const O: usize> Default for AdamsInfo<N, S, O>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, O>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn default() -> Self {
@@ -171,18 +161,16 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName, O: DimName> IVPSolver<N, S>
-    for AdamsInfo<N, S, O>
+impl<N, const S: usize, const O: usize> IVPSolver<N, S> for AdamsInfo<N, S, O>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, O>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    fn step<T: Clone, F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>>(
-        &mut self,
-        mut f: F,
-        params: &mut T,
-    ) -> Result<IVPStatus<N, S>, String> {
+    fn step<T, F>(&mut self, mut f: F, params: &mut T) -> Result<IVPStatus<N, S>, String>
+    where
+        T: Clone,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
+    {
         if self.time.unwrap() >= self.end.unwrap() {
             return Ok(IVPStatus::Done);
         }
@@ -233,7 +221,7 @@ where
 
         let wp = &self.state.as_ref().unwrap();
         let wp =
-            VectorN::<N, S>::from_iterator(wp.as_slice().iter().enumerate().map(|(ind, y)| {
+            SVector::<N, S>::from_iterator(wp.as_slice().iter().enumerate().map(|(ind, y)| {
                 let mut acc = *y;
                 let dt = N::from_real(self.dt.unwrap());
                 for (j, mem) in self.memory.iter().enumerate() {
@@ -251,7 +239,7 @@ where
         )?;
         let wc = &self.state.as_ref().unwrap();
         let wc =
-            VectorN::<N, S>::from_iterator(wc.as_slice().iter().enumerate().map(|(ind, y)| {
+            SVector::<N, S>::from_iterator(wc.as_slice().iter().enumerate().map(|(ind, y)| {
                 let dt = N::from_real(self.dt.unwrap());
                 let mut acc = implicit[ind] * self.corrector_coefficients[0] * dt;
                 for (j, mem) in self.memory.iter().enumerate() {
@@ -396,7 +384,7 @@ where
     }
 
     fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.state = Some(VectorN::<N, S>::from_column_slice(start));
+        self.state = Some(SVector::<N, S>::from_column_slice(start));
         Ok(self)
     }
 
@@ -404,7 +392,7 @@ where
         self
     }
 
-    fn get_initial_conditions(&self) -> Option<VectorN<N, S>> {
+    fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
         if let Some(state) = &self.state {
             Some(state.clone())
         } else {
@@ -446,10 +434,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::{SVector, U1};
 /// use bacon_sci::ivp::{Adams, AdamsSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<VectorN<f64, U1>, String> {
-///     Ok(VectorN::<f64, U1>::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, U1>, String> {
+///     Ok(SVector::<f64, U1>::from_column_slice(state))
 /// }
 ///
 ///
@@ -470,31 +458,27 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct Adams<N: ComplexField + FromPrimitive + Copy, S: DimName>
+pub struct Adams<N, const S: usize>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U5>,
-    DefaultAllocator: Allocator<N, U5>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    info: AdamsInfo<N, S, U5>,
+    info: AdamsInfo<N, S, 5>,
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> Adams<N, S>
+impl<N, const S: usize> Adams<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, U5>,
-    DefaultAllocator: Allocator<N::RealField, U5>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     pub fn new() -> Self {
         let mut info = AdamsInfo::new();
-        info.corrector_coefficients = VectorN::<N, U5>::from_iterator(
+        info.corrector_coefficients = SVector::<N, 5>::from_iterator(
             Self::corrector_coefficients()
                 .iter()
                 .map(|&x| N::from_real(x)),
         );
-        info.predictor_coefficients = VectorN::<N, U5>::from_iterator(
+        info.predictor_coefficients = SVector::<N, 5>::from_iterator(
             Self::predictor_coefficients()
                 .iter()
                 .map(|&x| N::from_real(x)),
@@ -505,11 +489,9 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> Default for Adams<N, S>
+impl<N, const S: usize> Default for Adams<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U5>,
-    DefaultAllocator: Allocator<N, U5>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn default() -> Self {
@@ -517,15 +499,13 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> AdamsSolver<N, S, U5> for Adams<N, S>
+impl<N, const S: usize> AdamsSolver<N, S, 5> for Adams<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U5>,
-    DefaultAllocator: Allocator<N, U5>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    fn predictor_coefficients() -> VectorN<N::RealField, U5> {
-        VectorN::<N::RealField, U5>::from_column_slice(&[
+    fn predictor_coefficients() -> SVector<N::RealField, 5> {
+        SVector::<N::RealField, 5>::from_column_slice(&[
             N::RealField::from_f64(55.0 / 24.0).unwrap(),
             N::RealField::from_f64(-59.0 / 24.0).unwrap(),
             N::RealField::from_f64(37.0 / 24.0).unwrap(),
@@ -534,8 +514,8 @@ where
         ])
     }
 
-    fn corrector_coefficients() -> VectorN<N::RealField, U5> {
-        VectorN::<N::RealField, U5>::from_column_slice(&[
+    fn corrector_coefficients() -> SVector<N::RealField, 5> {
+        SVector::<N::RealField, 5>::from_column_slice(&[
             N::RealField::from_f64(251.0 / 720.0).unwrap(),
             N::RealField::from_f64(646.0 / 720.0).unwrap(),
             N::RealField::from_f64(-264.0 / 720.0).unwrap(),
@@ -550,7 +530,7 @@ where
 
     fn solve_ivp<
         T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
     >(
         self,
         f: F,
@@ -595,14 +575,12 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> From<Adams<N, S>> for AdamsInfo<N, S, U5>
+impl<N, const S: usize> From<Adams<N, S>> for AdamsInfo<N, S, 5>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, U5>,
-    DefaultAllocator: Allocator<N::RealField, U5>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    fn from(adams: Adams<N, S>) -> AdamsInfo<N, S, U5> {
+    fn from(adams: Adams<N, S>) -> AdamsInfo<N, S, 5> {
         adams.info
     }
 }
@@ -614,10 +592,10 @@ where
 ///
 /// # Examples
 /// ```
-/// use nalgebra::{VectorN, U1};
+/// use nalgebra::{SVector, U1};
 /// use bacon_sci::ivp::{Adams2, AdamsSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<VectorN<f64, U1>, String> {
-///     Ok(VectorN::<f64, U1>::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, U1>, String> {
+///     Ok(SVector::<f64, U1>::from_column_slice(state))
 /// }
 ///
 ///
@@ -638,31 +616,27 @@ where
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct Adams2<N: ComplexField + FromPrimitive + Copy, S: DimName>
+pub struct Adams2<N, const S: usize>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U3>,
-    DefaultAllocator: Allocator<N, U3>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    info: AdamsInfo<N, S, U3>,
+    info: AdamsInfo<N, S, 3>,
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> Adams2<N, S>
+impl<N, const S: usize> Adams2<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, U3>,
-    DefaultAllocator: Allocator<N::RealField, U3>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     pub fn new() -> Self {
         let mut info = AdamsInfo::new();
-        info.corrector_coefficients = VectorN::<N, U3>::from_iterator(
+        info.corrector_coefficients = SVector::<N, 3>::from_iterator(
             Self::corrector_coefficients()
                 .iter()
                 .map(|&x| N::from_real(x)),
         );
-        info.predictor_coefficients = VectorN::<N, U3>::from_iterator(
+        info.predictor_coefficients = SVector::<N, 3>::from_iterator(
             Self::predictor_coefficients()
                 .iter()
                 .map(|&x| N::from_real(x)),
@@ -673,11 +647,9 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> Default for Adams2<N, S>
+impl<N, const S: usize> Default for Adams2<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U3>,
-    DefaultAllocator: Allocator<N, U3>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn default() -> Self {
@@ -685,23 +657,21 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> AdamsSolver<N, S, U3> for Adams2<N, S>
+impl<N, const S: usize> AdamsSolver<N, S, 3> for Adams2<N, S>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N::RealField, U3>,
-    DefaultAllocator: Allocator<N, U3>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    fn predictor_coefficients() -> VectorN<N::RealField, U3> {
-        VectorN::<N::RealField, U3>::from_column_slice(&[
+    fn predictor_coefficients() -> SVector<N::RealField, 3> {
+        SVector::<N::RealField, 3>::from_column_slice(&[
             N::RealField::from_f64(1.5).unwrap(),
             N::RealField::from_f64(-0.5).unwrap(),
             N::RealField::zero(),
         ])
     }
 
-    fn corrector_coefficients() -> VectorN<N::RealField, U3> {
-        VectorN::<N::RealField, U3>::from_column_slice(&[
+    fn corrector_coefficients() -> SVector<N::RealField, 3> {
+        SVector::<N::RealField, 3>::from_column_slice(&[
             N::RealField::from_f64(5.0 / 12.0).unwrap(),
             N::RealField::from_f64(2.0 / 3.0).unwrap(),
             N::RealField::from_f64(-1.0 / 12.0).unwrap(),
@@ -714,7 +684,7 @@ where
 
     fn solve_ivp<
         T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<VectorN<N, S>, String>,
+        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
     >(
         self,
         f: F,
@@ -759,14 +729,12 @@ where
     }
 }
 
-impl<N: ComplexField + FromPrimitive + Copy, S: DimName> From<Adams2<N, S>> for AdamsInfo<N, S, U3>
+impl<N, const S: usize> From<Adams2<N, S>> for AdamsInfo<N, S, 3>
 where
-    DefaultAllocator: Allocator<N, S>,
-    DefaultAllocator: Allocator<N, U3>,
-    DefaultAllocator: Allocator<N::RealField, U3>,
+    N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    fn from(adams: Adams2<N, S>) -> AdamsInfo<N, S, U3> {
+    fn from(adams: Adams2<N, S>) -> AdamsInfo<N, S, 3> {
         adams.info
     }
 }

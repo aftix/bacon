@@ -5,7 +5,7 @@
  */
 
 use crate::roots;
-use nalgebra::{MatrixN, VectorN, U1, U2, U3};
+use nalgebra::{SMatrix, SVector};
 use std::f64;
 
 mod polynomial;
@@ -38,16 +38,16 @@ fn poly(x: f64) -> f64 {
     (10.0 / (x + 4.0)).sqrt()
 }
 
-fn newton_complex(x: &[f64]) -> VectorN<f64, U3> {
-    VectorN::<f64, U3>::from_column_slice(&[
+fn newton_complex(x: &[f64]) -> SVector<f64, 3> {
+    SVector::<f64, 3>::from_column_slice(&[
         3.0 * x[0] - (x[1] * x[2]).cos() - 0.5,
         x[0].powi(2) - 81.0 * (x[1] + 0.1).powi(2) + x[2].sin() + 1.06,
         (-x[0] * x[1]).exp() + 20.0 * x[2] + (f64::consts::PI * 10.0 - 3.0) / 3.0,
     ])
 }
 
-fn jac_complex(x: &[f64]) -> MatrixN<f64, U3> {
-    MatrixN::<f64, U3>::new(
+fn jac_complex(x: &[f64]) -> SMatrix<f64, 3, 3> {
+    SMatrix::<f64, 3, 3>::new(
         3.0,
         x[2] * (x[1] * x[2]).sin(),
         x[1] * (x[1] * x[2]).sin(),
@@ -61,16 +61,16 @@ fn jac_complex(x: &[f64]) -> MatrixN<f64, U3> {
 }
 
 // Solve x^n = exp(x) where n is 2+index (since x = exp(x) has no solution)
-fn exp_newton(x: &[f64]) -> VectorN<f64, U2> {
-    VectorN::<f64, U2>::from_iterator(
+fn exp_newton(x: &[f64]) -> SVector<f64, 2> {
+    SVector::<f64, 2>::from_iterator(
         x.iter()
             .enumerate()
             .map(|(i, x)| x.exp() - x.powi(i as i32 + 2)),
     )
 }
 
-fn exp_newton_deriv(x: &[f64]) -> MatrixN<f64, U2> {
-    MatrixN::<f64, U2>::new(
+fn exp_newton_deriv(x: &[f64]) -> SMatrix<f64, 2, 2> {
+    SMatrix::<f64, 2, 2>::new(
         x[0].exp() - 2.0 * x[0],
         0.0,
         0.0,
@@ -78,8 +78,8 @@ fn exp_newton_deriv(x: &[f64]) -> MatrixN<f64, U2> {
     )
 }
 
-fn cos_secant(x: &[f64]) -> VectorN<f64, U1> {
-    VectorN::<f64, U1>::from_iterator(x.iter().map(|x| x.cos() - x))
+fn cos_secant(x: &[f64]) -> SVector<f64, 1> {
+    SVector::<f64, 1>::from_iterator(x.iter().map(|x| x.cos() - x))
 }
 
 #[test]

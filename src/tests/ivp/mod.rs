@@ -10,26 +10,26 @@ mod euler;
 mod rk;
 
 use crate::ivp::solve_ivp;
-use nalgebra::{VectorN, U1, U2};
+use nalgebra::SVector;
 
-fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
-    Ok(VectorN::<f64, U1>::from_column_slice(y))
+fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, String> {
+    Ok(SVector::<f64, 1>::from_column_slice(y))
 }
 
-fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
-    Ok(VectorN::<f64, U1>::from_column_slice(&[-2.0 * t]))
+fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, String> {
+    Ok(SVector::<f64, 1>::from_column_slice(&[-2.0 * t]))
 }
 
-fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
-    Ok(VectorN::<f64, U1>::from_iterator(y.iter().map(|_| t.cos())))
+fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, String> {
+    Ok(SVector::<f64, 1>::from_iterator(y.iter().map(|_| t.cos())))
 }
 
-fn unstable_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U1>, String> {
-    Ok(-VectorN::<f64, U1>::from_column_slice(y))
+fn unstable_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, String> {
+    Ok(-SVector::<f64, 1>::from_column_slice(y))
 }
 
-fn cos_deriv(_t: f64, y: &[f64], _: &mut ()) -> Result<VectorN<f64, U2>, String> {
-    Ok(VectorN::<f64, U2>::from_column_slice(&[y[1], -y[0]]))
+fn cos_deriv(_t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 2>, String> {
+    Ok(SVector::<f64, 2>::from_column_slice(&[y[1], -y[0]]))
 }
 
 #[test]
