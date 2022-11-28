@@ -205,7 +205,7 @@ where
     while n < n_max {
         let f_val = -f(guess.as_slice());
         let f_deriv_val = jac(guess.as_slice());
-        let lu = f_deriv_val.clone().lu();
+        let lu = f_deriv_val.lu();
         match lu.solve(&f_val) {
             None => return Err("newton: failed to solve linear equation".to_owned()),
             Some(adjustment) => {

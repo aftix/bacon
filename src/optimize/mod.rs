@@ -51,10 +51,10 @@ fn jac_finite_differences<N, F, const V: usize>(
     for row in 0..mat.column(0).len() {
         for col in 0..mat.row(0).len() {
             params[col] += h;
-            let above = f(xs[row], &params);
+            let above = f(xs[row], params);
             params[col] -= h;
             params[col] -= h;
-            let below = f(xs[row], &params);
+            let below = f(xs[row], params);
             mat[(row, col)] = denom * (above + below);
             params[col] += h;
         }
@@ -72,7 +72,7 @@ fn jac_analytic<N, F, const V: usize>(
     F: FnMut(N, &SVector<N, V>) -> SVector<N, V>,
 {
     for row in 0..mat.column(0).len() {
-        let deriv = jac(xs[row], &params);
+        let deriv = jac(xs[row], params);
         for col in 0..mat.row(0).len() {
             mat[(row, col)] = deriv[col];
         }
@@ -208,7 +208,7 @@ where
         if !solved {
             return Err("curve_fit: unable to solve linear equation".to_owned());
         }
-        let new_params = &params + &b;
+        let new_params = params + &b;
 
         // Now solve for damping / damping_mult
         for i in 0..multiplied_div.row(0).len() {
@@ -227,7 +227,7 @@ where
                 }
             }
         }
-        let new_params_div = &params + &b_div;
+        let new_params_div = params + &b_div;
 
         // get residuals for each of the new solutions
         evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &new_params)));
@@ -386,7 +386,7 @@ where
                 }
             }
         }
-        let new_params = &params + &b;
+        let new_params = params + &b;
 
         // Now solve for damping / damping_mult
         for i in 0..multiplied_div.row(0).len() {
@@ -405,7 +405,7 @@ where
                 }
             }
         }
-        let new_params_div = &params + &b_div;
+        let new_params_div = params + &b_div;
 
         // get residuals for each of the new solutions
         evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &new_params)));

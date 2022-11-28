@@ -6,10 +6,10 @@ fn main() {
     // based off of parse_constants_2018toXXXX from scipy.constants.codata
     for line in data.lines().skip(11) {
         let name = line[..60].trim_end();
-        let val = line[60..85].trim_end().replace(" ", "_").replace("...", "");
+        let val = line[60..85].trim_end().replace(' ', "_").replace("...", "");
         let uncert = line[85..110]
             .trim_end()
-            .replace(" ", "_")
+            .replace(' ', "_")
             .replace("(exact)", "0");
         let units = line[110..].trim_end();
         map.entry(name, &format!("({}f64, {}f64, {:?})", val, uncert, units));

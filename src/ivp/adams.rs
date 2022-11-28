@@ -139,7 +139,7 @@ where
         let k4 = f(time + dt, intermediate.as_slice(), &mut params.clone())? * N::from_real(dt);
         if i != 0 {
             derivs.push_back(f(time, state.as_slice(), params)?);
-            states.push_back((time, state.clone()));
+            states.push_back((time, state));
         }
         state += (k1 + k2 * N::from_f64(2.0).unwrap() + k3 * N::from_f64(2.0).unwrap() + k4)
             * N::from_f64(1.0 / 6.0).unwrap();
@@ -192,7 +192,7 @@ where
             *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
             return Ok(IVPStatus::Ok(vec![(
                 self.time.unwrap(),
-                self.states.back().unwrap().1.clone(),
+                self.states.back().unwrap().1,
             )]));
         }
 
@@ -212,7 +212,7 @@ where
                     + N::RealField::from_usize(self.predictor_coefficients.len() - 1).unwrap()
                         * self.dt.unwrap(),
             );
-            self.state = Some(self.states.back().unwrap().1.clone());
+            self.state = Some(self.states.back().unwrap().1);
         }
 
         let tenth_real = N::RealField::from_f64(0.1).unwrap();
@@ -258,15 +258,15 @@ where
             self.time = Some(self.time.unwrap() + self.dt.unwrap());
             if self.nflag {
                 for state in self.states.iter() {
-                    output.push((state.0, state.1.clone()));
+                    output.push((state.0, state.1));
                 }
                 self.nflag = false;
             }
-            output.push((self.time.unwrap(), self.state.as_ref().unwrap().clone()));
+            output.push((self.time.unwrap(), *self.state.as_ref().unwrap()));
 
             self.memory.push_back(implicit);
             self.states
-                .push_back((self.time.unwrap(), self.state.as_ref().unwrap().clone()));
+                .push_back((self.time.unwrap(), *self.state.as_ref().unwrap()));
             self.memory.pop_front();
             self.states.pop_front();
 
@@ -393,33 +393,25 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {
-        if let Some(time) = &self.time {
-            Some(*time)
-        } else {
-            None
-        }
+        self.time.as_ref().copied()
     }
 
     fn check_start(&self) -> Result<(), String> {
-        if self.time == None {
+        if self.time.is_none() {
             Err("AdamsInfo check_start: No initial time".to_owned())
-        } else if self.end == None {
+        } else if self.end.is_none() {
             Err("AdamsInfo check_start: No end time".to_owned())
-        } else if self.tolerance == None {
+        } else if self.tolerance.is_none() {
             Err("AdamsInfo check_start: No tolerance".to_owned())
-        } else if self.state == None {
+        } else if self.state.is_none() {
             Err("AdamsInfo check_start: No initial conditions".to_owned())
-        } else if self.dt_max == None {
+        } else if self.dt_max.is_none() {
             Err("AdamsInfo check_start: No dt_max".to_owned())
-        } else if self.dt_min == None {
+        } else if self.dt_min.is_none() {
             Err("AdamsInfo check_start: No dt_min".to_owned())
         } else {
             Ok(())

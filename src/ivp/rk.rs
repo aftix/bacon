@@ -221,7 +221,7 @@ where
         if output {
             Ok(IVPStatus::Ok(vec![(
                 self.time.unwrap(),
-                self.state.as_ref().unwrap().clone(),
+                *self.state.as_ref().unwrap(),
             )]))
         } else {
             Ok(IVPStatus::Redo)
@@ -293,33 +293,25 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {
-        if let Some(time) = &self.time {
-            Some(*time)
-        } else {
-            None
-        }
+        self.time.as_ref().copied()
     }
 
     fn check_start(&self) -> Result<(), String> {
-        if self.time == None {
+        if self.time.is_none() {
             Err("RKInfo check_start: No initial time".to_owned())
-        } else if self.end == None {
+        } else if self.end.is_none() {
             Err("RKInfo check_start: No end time".to_owned())
-        } else if self.tolerance == None {
+        } else if self.tolerance.is_none() {
             Err("RKInfo check_start: No tolerance".to_owned())
-        } else if self.state == None {
+        } else if self.state.is_none() {
             Err("RKInfo check_start: No initial conditions".to_owned())
-        } else if self.dt_max == None {
+        } else if self.dt_max.is_none() {
             Err("RKInfo check_start: No dt_max".to_owned())
-        } else if self.dt_min == None {
+        } else if self.dt_min.is_none() {
             Err("RKInfo check_start: No dt_min".to_owned())
         } else {
             Ok(())

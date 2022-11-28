@@ -171,7 +171,7 @@ where
         *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
         Ok(IVPStatus::Ok(vec![(
             self.time.unwrap(),
-            self.state.clone().unwrap(),
+            self.state.unwrap(),
         )]))
     }
 
@@ -218,11 +218,7 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {
@@ -230,13 +226,13 @@ where
     }
 
     fn check_start(&self) -> Result<(), String> {
-        if self.time == None {
+        if self.time.is_none() {
             Err("Euler check_start: No initial time".to_owned())
-        } else if self.end == None {
+        } else if self.end.is_none() {
             Err("Euler check_start: No end time".to_owned())
-        } else if self.state == None {
+        } else if self.state.is_none() {
             Err("Euler check_start: No initial conditions".to_owned())
-        } else if self.dt == None {
+        } else if self.dt.is_none() {
             Err("Euler check_start: No dt".to_owned())
         } else {
             Ok(())

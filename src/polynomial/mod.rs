@@ -959,7 +959,7 @@ where
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
-        multiply(&self, &rhs)
+        multiply(&self, rhs)
     }
 }
 
@@ -970,7 +970,7 @@ where
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: Polynomial<N>) -> Polynomial<N> {
-        multiply(&self, &rhs)
+        multiply(self, &rhs)
     }
 }
 
@@ -981,7 +981,7 @@ where
     type Output = Polynomial<N>;
 
     fn mul(self, rhs: &Polynomial<N>) -> Polynomial<N> {
-        multiply(&self, &rhs)
+        multiply(self, rhs)
     }
 }
 
@@ -1001,7 +1001,7 @@ where
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn mul_assign(&mut self, rhs: Polynomial<N>) {
-        self.coefficients = multiply(&self, &rhs).coefficients;
+        self.coefficients = multiply(self, &rhs).coefficients;
     }
 }
 
@@ -1010,7 +1010,7 @@ where
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
     fn mul_assign(&mut self, rhs: &Polynomial<N>) {
-        self.coefficients = multiply(&self, &rhs).coefficients;
+        self.coefficients = multiply(self, rhs).coefficients;
     }
 }
 
