@@ -36,8 +36,10 @@ fn test_curve_fit() {
         .map(|&x| model(x, &SVector::<f64, 1>::from_column_slice(&[2.0])))
         .collect();
 
-    let mut params = CurveFitParams::default();
-    params.tolerance = 1e-7;
+    let params = CurveFitParams::<f64> {
+        tolerance: 1e-7,
+        ..Default::default()
+    };
     let solution = curve_fit(model, &xs, &ys, &[1.0], &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
     let solution = curve_fit(model, &xs, &ys, &[3.0], &params).unwrap();
@@ -60,8 +62,10 @@ fn test_curve_fit_jac() {
         .map(|&x| model(x, &SVector::<f64, 1>::from_column_slice(&[2.0])))
         .collect();
 
-    let mut params = CurveFitParams::default();
-    params.tolerance = 1e-7;
+    let params = CurveFitParams::<f64> {
+        tolerance: 1e-7,
+        ..Default::default()
+    };
     let solution = curve_fit_jac(model, &xs, &ys, &[1.0], model_jac, &params).unwrap();
     assert!(approx_eq!(f64, solution[0], 2.0, epsilon = 1e-3));
     let solution = curve_fit_jac(model, &xs, &ys, &[3.0], model_jac, &params).unwrap();
