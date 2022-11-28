@@ -123,19 +123,19 @@ where
     let mut time = time;
     for i in 0..num {
         let k1 = f(time, state.as_slice(), &mut params.clone())? * N::from_real(dt);
-        let intermediate = &state + &k1 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k1 * N::from_f64(0.5).unwrap();
         let k2 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k2 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k2 * N::from_f64(0.5).unwrap();
         let k3 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k3;
+        let intermediate = state + k3;
         let k4 = f(time + dt, intermediate.as_slice(), &mut params.clone())? * N::from_real(dt);
         if i != 0 {
             derivs.push_back(f(time, state.as_slice(), params)?);
@@ -250,7 +250,7 @@ where
                 acc + *y
             }));
 
-        let diff = &wc - &wp;
+        let diff = wc - wp;
         let error = self.error_coefficient / self.dt.unwrap() * diff.dot(&diff).sqrt().abs();
 
         if error <= self.tolerance.unwrap() {

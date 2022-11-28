@@ -209,7 +209,7 @@ where
         match lu.solve(&f_val) {
             None => return Err("newton: failed to solve linear equation".to_owned()),
             Some(adjustment) => {
-                let new_guess = &guess + &adjustment;
+                let new_guess = guess + adjustment;
                 let new_norm = new_guess.dot(&new_guess).sqrt().abs();
                 if ((norm - new_norm) / norm).abs() <= tol || new_norm <= tol {
                     return Ok(new_guess);
@@ -246,7 +246,7 @@ where
         x[col] -= h;
         let below = f(x.as_slice());
         x[col] += h;
-        let jac_col = (&above + &below) * denom;
+        let jac_col = (above + below) * denom;
         for row in 0..mat.column(0).len() {
             mat[(row, col)] = jac_col[row];
         }
@@ -313,19 +313,19 @@ where
         return Err("Secant: Can not inverse finite element difference jacobian".to_owned());
     };
 
-    let mut shift = -&jac_inv * &func_eval;
+    let mut shift = -jac_inv * func_eval;
     guess += &shift;
 
     while n < n_max {
         let func_eval_last = func_eval;
         func_eval = func(guess.as_slice());
-        let diff = &func_eval - &func_eval_last;
-        let adjustment = -&jac_inv * &diff;
+        let diff = func_eval - func_eval_last;
+        let adjustment = -jac_inv * diff;
         let s_transpose = shift.transpose();
-        let p = (-&s_transpose * &adjustment)[(0, 0)];
-        let u = &s_transpose * &jac_inv;
-        jac_inv += (&shift + &adjustment) * &u / p;
-        shift = -&jac_inv * &func_eval;
+        let p = (-s_transpose * adjustment)[(0, 0)];
+        let u = s_transpose * jac_inv;
+        jac_inv += (shift + adjustment) * u / p;
+        shift = -&jac_inv * func_eval;
         guess += &shift;
         if shift.norm().abs() <= tol {
             return Ok(guess);

@@ -132,19 +132,19 @@ where
     let mut time = time;
     for i in 0..num {
         let k1 = f(time, state.as_slice(), &mut params.clone())? * N::from_real(dt);
-        let intermediate = &state + &k1 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k1 * N::from_f64(0.5).unwrap();
         let k2 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k2 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k2 * N::from_f64(0.5).unwrap();
         let k3 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k3;
+        let intermediate = state + k3;
         let k4 = f(time + dt, intermediate.as_slice(), &mut params.clone())? * N::from_real(dt);
         if i != 0 {
             states.push_back((time, state));
@@ -237,7 +237,7 @@ where
                 * N::from_real(self.dt.unwrap())
                 * self.higher_coffecients[0];
             for (ind, coeff) in self.higher_coffecients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * *coeff;
+                state += self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -261,7 +261,7 @@ where
                 * N::from_real(self.dt.unwrap())
                 * self.lower_coefficients[0];
             for (ind, coeff) in self.lower_coefficients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * *coeff;
+                state += self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -273,7 +273,7 @@ where
             1000,
         )?;
 
-        let diff = &higher - &lower;
+        let diff = higher - lower;
         let error = diff.dot(&diff).sqrt().abs();
 
         if error <= self.tolerance.unwrap() {
