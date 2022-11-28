@@ -23,7 +23,7 @@ jobs:
         with:
           submodules: recursive
         
-      - uses: actions-rs/toolchain@v2
+      - uses: actions-rs/toolchain@v3
         with:
           toolchain: nightly
           override: true
@@ -48,7 +48,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions-rs/toolchain@v2
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
           override: true
