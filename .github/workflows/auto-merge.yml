@@ -1,0 +1,24 @@
+name: Auto-Merge
+on:
+  pull_request_target:
+    types: [labeled, opened]
+
+jobs:
+  enable-auto-merge-on-label:
+    runs-on: ubuntu-latest
+
+    # Specifically check that dependabot (or another trusted party) created this pull-request, and that it has been labelled correctly.
+    if: (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.user.login == 'aftix') && contains(github.event.pull_request.labels.*.name, 'automerge')
+    steps:
+      - uses: alexwilson/enable-github-automerge-action@main
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  enable-auto-merge-on-create:
+    runs-on: ubuntu-latest
+
+    if: (github.event.pull_request.user.login == 'dependabot[bot]' || github.event.pull_request.user.login == 'aftix') && github.event.pull_request.head.repo.id == github.event.repository.id
+    steps:
+      - uses: alexwilson/enable-github-automerge-action@main
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"

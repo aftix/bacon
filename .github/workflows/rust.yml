@@ -2,7 +2,6 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -11,12 +10,83 @@ env:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    name: Build library
+    strategy:
+      matrix:
+        # TODO: Features
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        profile: [dev, release]
+    runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+        
+      - uses: actions-rs/toolchain@v2
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+        
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --profile ${{ matrix.profile }}
+
+  clippy:
+    name: Cargo clippy
+    strategy:
+      matrix:
+        profile: [dev, release]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - uses: actions-rs/toolchain@v2
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Run Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --profile ${{ matrix.profile }} --all-targets --all-features --deny=warnings
+
+  test:
+    name: Cargo nextest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          recursive: true
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+
+      - name: Install cargo-nextest
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-nextest
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: nextest
+          args: run
