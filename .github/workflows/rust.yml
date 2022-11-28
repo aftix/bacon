@@ -61,7 +61,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --profile ${{ matrix.profile }} --all-targets --all-features --deny=warnings
+          args: --profile ${{ matrix.profile }} --all-targets --all-features -- --deny=warnings
 
   test:
     name: Cargo nextest
