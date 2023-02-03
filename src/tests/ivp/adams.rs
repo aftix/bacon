@@ -89,7 +89,7 @@ fn pc_test_quadratic() -> Result<(), String> {
 #[test]
 fn pc_sine() -> Result<(), String> {
     let t_initial = 0.0;
-    let t_final = 6.28;
+    let t_final = std::f64::consts::TAU;
 
     let solver = Adams::new()
         .with_dt_min(1e-5)?
@@ -188,7 +188,7 @@ fn adams2_test_quadratic() -> Result<(), String> {
 #[test]
 fn adams2_sine() -> Result<(), String> {
     let t_initial = 0.0;
-    let t_final = 6.28;
+    let t_final = std::f64::consts::TAU;
 
     let solver = Adams2::new()
         .with_dt_min(1e-5)?

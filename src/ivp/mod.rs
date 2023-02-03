@@ -226,13 +226,13 @@ where
     }
 
     fn check_start(&self) -> Result<(), String> {
-        if self.time == None {
+        if self.time.is_none() {
             Err("Euler check_start: No initial time".to_owned())
-        } else if self.end == None {
+        } else if self.end.is_none() {
             Err("Euler check_start: No end time".to_owned())
-        } else if self.state == None {
+        } else if self.state.is_none() {
             Err("Euler check_start: No initial conditions".to_owned())
-        } else if self.dt == None {
+        } else if self.dt.is_none() {
             Err("Euler check_start: No dt".to_owned())
         } else {
             Ok(())

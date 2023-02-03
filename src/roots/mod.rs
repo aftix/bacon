@@ -313,16 +313,16 @@ where
         return Err("Secant: Can not inverse finite element difference jacobian".to_owned());
     };
 
-    let mut shift = -&jac_inv * func_eval;
+    let mut shift = -jac_inv * func_eval;
     guess += &shift;
 
     while n < n_max {
         let func_eval_last = func_eval;
         func_eval = func(guess.as_slice());
         let diff = func_eval - func_eval_last;
-        let adjustment = -&jac_inv * diff;
+        let adjustment = -jac_inv * diff;
         let s_transpose = shift.transpose();
-        let p = (-&s_transpose * adjustment)[(0, 0)];
+        let p = (-s_transpose * adjustment)[(0, 0)];
         let u = s_transpose * jac_inv;
         jac_inv += (shift + adjustment) * u / p;
         shift = -&jac_inv * func_eval;
