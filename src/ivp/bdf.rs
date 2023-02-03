@@ -132,22 +132,22 @@ where
     let mut time = time;
     for i in 0..num {
         let k1 = f(time, state.as_slice(), &mut params.clone())? * N::from_real(dt);
-        let intermediate = &state + &k1 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k1 * N::from_f64(0.5).unwrap();
         let k2 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k2 * N::from_f64(0.5).unwrap();
+        let intermediate = state + k2 * N::from_f64(0.5).unwrap();
         let k3 = f(
             time + N::RealField::from_f64(0.5).unwrap() * dt,
             intermediate.as_slice(),
             &mut params.clone(),
         )? * N::from_real(dt);
-        let intermediate = &state + &k3;
+        let intermediate = state + k3;
         let k4 = f(time + dt, intermediate.as_slice(), &mut params.clone())? * N::from_real(dt);
         if i != 0 {
-            states.push_back((time, state.clone()));
+            states.push_back((time, state));
         }
         state += (k1 + k2 * N::from_f64(2.0).unwrap() + k3 * N::from_f64(2.0).unwrap() + k4)
             * N::from_f64(1.0 / 6.0).unwrap();
@@ -200,7 +200,7 @@ where
             *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
             return Ok(IVPStatus::Ok(vec![(
                 self.time.unwrap(),
-                self.memory.back().unwrap().1.clone(),
+                self.memory.back().unwrap().1,
             )]));
         }
 
@@ -219,7 +219,7 @@ where
                     + N::RealField::from_usize(self.higher_coffecients.len()).unwrap()
                         * self.dt.unwrap(),
             );
-            self.state = Some(self.memory.back().unwrap().1.clone());
+            self.state = Some(self.memory.back().unwrap().1);
         }
 
         let tenth_real = N::RealField::from_f64(0.1).unwrap();
@@ -237,7 +237,7 @@ where
                 * N::from_real(self.dt.unwrap())
                 * self.higher_coffecients[0];
             for (ind, coeff) in self.higher_coffecients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * *coeff;
+                state += self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -261,7 +261,7 @@ where
                 * N::from_real(self.dt.unwrap())
                 * self.lower_coefficients[0];
             for (ind, coeff) in self.lower_coefficients.iter().enumerate().skip(1) {
-                state += &self.memory[self.memory.len() - ind].1 * *coeff;
+                state += self.memory[self.memory.len() - ind].1 * *coeff;
             }
             state + y
         };
@@ -273,19 +273,19 @@ where
             1000,
         )?;
 
-        let diff = &higher - &lower;
+        let diff = higher - lower;
         let error = diff.dot(&diff).sqrt().abs();
 
         if error <= self.tolerance.unwrap() {
-            self.state = Some(higher.clone());
+            self.state = Some(higher);
             self.time = Some(self.time.unwrap() + self.dt.unwrap());
             if self.nflag {
                 for state in self.memory.iter() {
-                    output.push((state.0, state.1.clone()));
+                    output.push((state.0, state.1));
                 }
                 self.nflag = false;
             }
-            output.push((self.time.unwrap(), self.state.as_ref().unwrap().clone()));
+            output.push((self.time.unwrap(), *self.state.as_ref().unwrap()));
 
             self.memory.push_back((self.time.unwrap(), higher));
             self.memory.pop_front();
@@ -395,19 +395,11 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {
-        if let Some(time) = &self.time {
-            Some(*time)
-        } else {
-            None
-        }
+        self.time.as_ref().copied()
     }
 
     fn check_start(&self) -> Result<(), String> {

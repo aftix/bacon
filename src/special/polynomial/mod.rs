@@ -8,6 +8,12 @@ use num_traits::FromPrimitive;
 /// Gets the nth legendre polynomial over a specified field. This is
 /// done using the recurrence relation and is properly normalized.
 ///
+/// # Errors
+/// Returns an error if `tol` is invalid.
+///
+/// # Panics
+/// Panics if a u8 or a u32 can not be converted into the generic type.
+///
 /// # Examples
 /// ```
 /// use bacon_sci::special::legendre;
@@ -59,6 +65,9 @@ where
 /// Get the zeros of the nth legendre polynomial.
 /// Calculate zeros to tolerance `tol`, have polynomials
 /// with tolerance `poly_tol`.
+///
+/// # Errors
+/// Returns an error if `tol` or `poly_tol` are invalid
 pub fn legendre_zeros<N: ComplexField + FromPrimitive + Copy>(
     n: u32,
     tol: N::RealField,
@@ -95,6 +104,12 @@ where
 /// done using the recurrance relation so the normalization is standard for the
 /// physicist's hermite polynomial.
 ///
+/// # Errors
+/// Returns an error if `tol` is invalid.
+///
+/// # Panics
+/// Panics if a u8 or u32 can not be converted into the generic type.
+///
 /// # Examples
 /// ```
 /// use bacon_sci::special::hermite;
@@ -120,19 +135,19 @@ where
         return Ok(poly);
     }
     if n == 1 {
-        let mut poly = polynomial![N::from_f64(2.0).unwrap(), N::zero()];
+        let mut poly = polynomial![N::from_u8(2).unwrap(), N::zero()];
         poly.set_tolerance(tol)?;
         return Ok(poly);
     }
 
     let mut h_0 = polynomial![N::one()];
     h_0.set_tolerance(tol)?;
-    let mut h_1 = polynomial![N::from_f64(2.0).unwrap(), N::zero()];
+    let mut h_1 = polynomial![N::from_u8(2).unwrap(), N::zero()];
     h_1.set_tolerance(tol)?;
     let x_2 = h_1.clone();
 
     for i in 1..n {
-        let next = &x_2 * &h_1 - (&h_0 * N::from_f64(2.0 * i as f64).unwrap());
+        let next = &x_2 * &h_1 - (&h_0 * N::from_u32(2 * i).unwrap());
         h_0 = h_1;
         h_1 = next;
     }
@@ -142,6 +157,12 @@ where
 
 /// Get the zeros of the nth Hermite polynomial within tolerance `tol` with polynomial
 /// tolerance `poly_tol`
+///
+/// # Errors
+/// Returns an error if `poly_tol` or `tol` are invalid.
+///
+/// # Panics
+/// Panics if a u32 or f32 can not be converted into the generic type.
 pub fn hermite_zeros<N: ComplexField + FromPrimitive + Copy>(
     n: u32,
     tol: N::RealField,
@@ -162,8 +183,8 @@ where
 
     // Get initial guesses of zeros with asymptotic formula
     let mut zeros = Vec::with_capacity(n as usize);
-    let special = N::from_f64(3.3721 / 6.0.cbrt()).unwrap();
-    let third = N::from_f64(1.0 / 3.0).unwrap().real();
+    let special = N::from_f32(3.3721 / 6.0.cbrt()).unwrap();
+    let third = N::from_f32(1.0 / 3.0).unwrap().real();
     for i in 1..=n {
         let sqrt = N::from_u32(2 * i).unwrap().sqrt();
         zeros.push(sqrt - special * sqrt.powf(-third));
@@ -208,6 +229,9 @@ fn choose<N: ComplexField + FromPrimitive>(n: u32, k: u32) -> N {
 /// Gets the nth (positive) laguerre polynomial over a specified field. This is
 /// done using the direct formula and is properly normalized.
 ///
+/// # Errors
+/// Returns an error if `tol` is invalid.
+///
 /// # Examples
 /// ```
 /// use bacon_sci::special::laguerre;
@@ -240,6 +264,9 @@ where
 }
 
 /// Get the zeros of the nth Laguerre polynomial
+///
+/// # Errors
+/// Returns an error if `tol` or `poly_tol` are invalid
 pub fn laguerre_zeros<N: ComplexField + Copy + FromPrimitive>(
     n: u32,
     tol: N::RealField,
@@ -276,6 +303,12 @@ where
 /// Gets the nth chebyshev polynomial over a specified field. This is
 /// done using the recursive formula and is properly normalized.
 ///
+/// # Errors
+/// Returns an error on invalid tolerance
+///
+/// # Panics
+/// Panics if a u8 can not be transformed into the generic type.
+///
 /// # Examples
 /// ```
 /// use bacon_sci::special::chebyshev;
@@ -306,13 +339,12 @@ where
         return Ok(poly);
     }
 
+    let half = chebyshev(n / 2, tol)?;
     if n % 2 == 0 {
-        let half = chebyshev(n / 2, tol)?;
-        Ok(&half * &half * N::from_i32(2).unwrap() - polynomial![N::one()])
+        Ok(&half * &half * N::from_u8(2).unwrap() - polynomial![N::one()])
     } else {
-        let half = chebyshev(n / 2, tol)?;
         let other_half = chebyshev(n / 2 + 1, tol)?;
-        Ok(&half * &other_half * N::from_i32(2).unwrap() - polynomial![N::one(), N::zero()])
+        Ok(&half * &other_half * N::from_u8(2).unwrap() - polynomial![N::one(), N::zero()])
     }
 }
 
@@ -320,6 +352,12 @@ where
 ///
 /// Gets the nth chebyshev polynomial of the second kind over a specified field. This is
 /// done using the recursive formula and is properly normalized.
+///
+/// # Errors
+/// Returns an error on invalid tolerance
+///
+/// # Panics
+/// Panics if a u8 can not be transformed into the generic type.
 ///
 /// # Examples
 /// ```
@@ -346,14 +384,14 @@ where
         return Ok(poly);
     }
     if n == 1 {
-        let mut poly = polynomial![N::from_i32(2).unwrap(), N::zero()];
+        let mut poly = polynomial![N::from_u8(2).unwrap(), N::zero()];
         poly.set_tolerance(tol)?;
         return Ok(poly);
     }
 
     let mut t_0 = polynomial![N::one()];
     t_0.set_tolerance(tol)?;
-    let mut t_1 = polynomial![N::from_i32(2).unwrap(), N::zero()];
+    let mut t_1 = polynomial![N::from_u8(2).unwrap(), N::zero()];
     t_1.set_tolerance(tol)?;
     let double = t_1.clone();
 

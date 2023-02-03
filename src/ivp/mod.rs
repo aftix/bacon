@@ -171,7 +171,7 @@ where
         *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
         Ok(IVPStatus::Ok(vec![(
             self.time.unwrap(),
-            self.state.clone().unwrap(),
+            self.state.unwrap(),
         )]))
     }
 
@@ -218,11 +218,7 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {

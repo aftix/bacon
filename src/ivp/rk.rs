@@ -221,7 +221,7 @@ where
         if output {
             Ok(IVPStatus::Ok(vec![(
                 self.time.unwrap(),
-                self.state.as_ref().unwrap().clone(),
+                *self.state.as_ref().unwrap(),
             )]))
         } else {
             Ok(IVPStatus::Redo)
@@ -293,19 +293,11 @@ where
     }
 
     fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        if let Some(state) = &self.state {
-            Some(state.clone())
-        } else {
-            None
-        }
+        self.state.as_ref().copied()
     }
 
     fn get_time(&self) -> Option<N::RealField> {
-        if let Some(time) = &self.time {
-            Some(*time)
-        } else {
-            None
-        }
+        self.time.as_ref().copied()
     }
 
     fn check_start(&self) -> Result<(), String> {
@@ -364,6 +356,46 @@ where
     <N as ComplexField>::RealField: FromPrimitive,
 {
     info: RKInfo<N, S, 6>,
+}
+
+// Derivatives for tests
+#[cfg(test)]
+fn exp_deriv(_: f32, y: &[f32], _: &mut ()) -> Result<SVector<f32, 1>, String> {
+    Ok(SVector::from_column_slice(y))
+}
+
+// Tests for RK45
+#[test]
+fn rk45_exp() -> Result<(), String> {
+    let t_initial = 0.0;
+    let t_final = 2.0;
+
+    let solver = RK45::new()
+        .with_dt_min(0.0001)?
+        .with_dt_max(0.001)?
+        .with_start(t_initial)?
+        .with_end(t_final)?
+        .with_tolerance(0.000001)?
+        .with_initial_conditions(&[1.0])?;
+
+    let path = solver.solve_ivp(&exp_deriv, &mut ());
+
+    match path {
+        Ok(path) => {
+            for step in &path {
+                println!("{} {}", step.1.column(0)[0], step.0.exp());
+                assert!(approx_eq!(
+                    f32,
+                    step.1.column(0)[0],
+                    step.0.exp(),
+                    epsilon = 0.01
+                ));
+            }
+        }
+        Err(s) => panic!("Result not Ok: {}", s),
+    }
+
+    Ok(())
 }
 
 impl<N, const S: usize> RK45<N, S>
@@ -584,7 +616,6 @@ where
     N: ComplexField + FromPrimitive + Copy,
     <N as ComplexField>::RealField: FromPrimitive + Copy,
 {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let mut info: RKInfo<N, S, 4> = RKInfo::new();
         info.a_coefficients = SVector::<N, 4>::from_iterator(
@@ -612,6 +643,16 @@ where
                 .map(|x| N::from_real(*x)),
         );
         RK23 { info }
+    }
+}
+
+impl<N, const S: usize> Default for RK23<N, S>
+where
+    N: ComplexField + FromPrimitive + Copy,
+    <N as ComplexField>::RealField: FromPrimitive + Copy,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 

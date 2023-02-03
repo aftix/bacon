@@ -112,7 +112,7 @@ where
     let mut hermite = polynomial![N::zero()];
     for i in (1..2 * xs.len()).rev() {
         hermite += qs[i + i * (2 * xs.len())];
-        hermite *= polynomial![N::one(), -xs[(i - 1) / 2]]
+        hermite *= polynomial![N::one(), -xs[(i - 1) / 2]];
     }
     hermite += qs[0];
 

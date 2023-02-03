@@ -12,7 +12,7 @@ fn main() {
             .replace(" ", "_")
             .replace("(exact)", "0");
         let units = line[110..].trim_end();
-        map.entry(name, &format!("({}f64, {}f64, {:?})", val, uncert, units));
+        map.entry(name, &format!("({}_f64, {}_f64, {:?})", val, uncert, units));
     }
     let mut path = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
     path.push("codata.rs");

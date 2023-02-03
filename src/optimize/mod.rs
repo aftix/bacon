@@ -3,6 +3,12 @@ use nalgebra::{ComplexField, DMatrix, DVector, RealField, SVector};
 use num_traits::{FromPrimitive, One, Zero};
 
 /// Linear least-squares regression
+///
+/// # Errors
+/// Returns an error if the linear fit fails. (`xs.len() != ys.len()`)
+///
+/// # Panics
+/// Panics if a `usize` can not be transformed into the generic type.
 pub fn linear_fit<N>(xs: &[N], ys: &[N]) -> Result<Polynomial<N>, String>
 where
     N: ComplexField + FromPrimitive + Copy,
@@ -51,10 +57,10 @@ fn jac_finite_differences<N, F, const V: usize>(
     for row in 0..mat.column(0).len() {
         for col in 0..mat.row(0).len() {
             params[col] += h;
-            let above = f(xs[row], &params);
+            let above = f(xs[row], params);
             params[col] -= h;
             params[col] -= h;
-            let below = f(xs[row], &params);
+            let below = f(xs[row], params);
             mat[(row, col)] = denom * (above + below);
             params[col] += h;
         }
@@ -72,7 +78,7 @@ fn jac_analytic<N, F, const V: usize>(
     F: FnMut(N, &SVector<N, V>) -> SVector<N, V>,
 {
     for row in 0..mat.column(0).len() {
-        let deriv = jac(xs[row], &params);
+        let deriv = jac(xs[row], params);
         for col in 0..mat.row(0).len() {
             mat[(row, col)] = deriv[col];
         }
@@ -98,12 +104,155 @@ impl<N: ComplexField + FromPrimitive> Default for CurveFitParams<N> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn initial_residuals<N, F, const V: usize>(
+    xs: &[N],
+    ys: &DVector<N>,
+    damping: &mut N::RealField,
+    damping_mult: N::RealField,
+    h: N::RealField,
+    mut f: F,
+    jac: &mut DMatrix<N>,
+    jac_transpose: &mut DMatrix<N>,
+    mut params: SVector<N, V>,
+) -> Result<(N::RealField, DVector<N>), String>
+where
+    N: ComplexField + Copy + FromPrimitive,
+    <N as ComplexField>::RealField: Copy + FromPrimitive,
+    F: FnMut(N, &SVector<N, V>) -> N,
+{
+    let mut resid = Vec::with_capacity(xs.len());
+    for (ind, &x) in xs.iter().enumerate() {
+        resid.push(ys[ind] - f(x, &params));
+    }
+    let sum_sq_initial: N::RealField = resid
+        .iter()
+        .map(|&r| r.modulus_squared())
+        .fold(N::RealField::zero(), |acc, r| acc + r);
+
+    // Get initial factor
+    let mut sum_sq = sum_sq_initial + N::RealField::one();
+    let mut damping_tmp = *damping / damping_mult;
+    let mut j = 0;
+    let mut evaluation: DVector<N> =
+        DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
+    while sum_sq > sum_sq_initial && j < 1000 {
+        damping_tmp *= damping_mult;
+        let diff = ys - &evaluation;
+        let mut b = jac_transpose as &DMatrix<N> * &diff;
+        // Always square
+        let mut multiplied = jac_transpose as &DMatrix<N> * jac as &DMatrix<N>;
+        for i in 0..multiplied.row(0).len() {
+            multiplied[(i, i)] *= N::one() + N::from_real(damping_tmp);
+        }
+        let lu = multiplied.clone().lu();
+        let solved = lu.solve_mut(&mut b);
+        if !solved {
+            return Err("curve_fit: unable to solve linear equation".to_owned());
+        }
+        params += &b;
+        evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
+        let diff = ys - &evaluation;
+        sum_sq = diff
+            .iter()
+            .map(|&r| r.modulus_squared())
+            .fold(N::RealField::zero(), |acc, r| acc + r);
+        j += 1;
+        jac_finite_differences(&mut f, xs, &mut params, jac, h);
+        *jac_transpose = jac.transpose();
+    }
+    if j != 1000 {
+        *damping = damping_tmp;
+    }
+    Ok((sum_sq, evaluation))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn initial_residuals_exact<N, F, G, const V: usize>(
+    xs: &[N],
+    ys: &DVector<N>,
+    damping: &mut N::RealField,
+    damping_mult: N::RealField,
+    mut f: F,
+    mut jacobian: G,
+    jac: &mut DMatrix<N>,
+    jac_transpose: &mut DMatrix<N>,
+    mut params: SVector<N, V>,
+) -> Result<(N::RealField, DVector<N>), String>
+where
+    N: ComplexField + Copy + FromPrimitive,
+    <N as ComplexField>::RealField: Copy + FromPrimitive,
+    F: FnMut(N, &SVector<N, V>) -> N,
+    G: FnMut(N, &SVector<N, V>) -> SVector<N, V>,
+{
+    // Get the initial sum of square residuals
+    let mut resid = Vec::with_capacity(xs.len());
+    for (ind, &x) in xs.iter().enumerate() {
+        resid.push(ys[ind] - f(x, &params));
+    }
+    let sum_sq_initial: N::RealField = resid
+        .iter()
+        .map(|&r| r.modulus_squared())
+        .fold(N::RealField::zero(), |acc, r| acc + r);
+
+    // Get initial factor
+    let mut sum_sq = sum_sq_initial + N::RealField::one();
+    let mut damping_tmp = *damping / damping_mult;
+    let mut j = 0;
+    let mut evaluation: DVector<N> =
+        DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
+    while sum_sq > sum_sq_initial && j < 1000 {
+        damping_tmp *= damping_mult;
+        let diff = ys - &evaluation;
+        let mut b = jac_transpose as &DMatrix<N> * &diff;
+        // Always square
+        let mut multiplied = jac_transpose as &DMatrix<N> * jac as &DMatrix<N>;
+        for i in 0..multiplied.row(0).len() {
+            multiplied[(i, i)] *= N::one() + N::from_real(damping_tmp);
+        }
+        let lu = multiplied.clone().lu();
+        let solved = lu.solve_mut(&mut b);
+        if !solved {
+            let lu = multiplied.clone().full_piv_lu();
+            let full_lu_solved = lu.solve_mut(&mut b);
+            if !full_lu_solved {
+                let qr = multiplied.qr();
+                let qr_solved = qr.solve_mut(&mut b);
+                if !qr_solved {
+                    return Err("curve_fit_jac: unable to solve linear equation".to_owned());
+                }
+            }
+        }
+        params += &b;
+        evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
+        let diff = ys - &evaluation;
+        sum_sq = diff
+            .iter()
+            .map(|&r| r.modulus_squared())
+            .fold(N::RealField::zero(), |acc, r| acc + r);
+        j += 1;
+        jac_analytic(&mut jacobian, xs, &mut params, jac);
+        *jac_transpose = jac.transpose();
+    }
+    if j != 1000 {
+        *damping = damping_tmp;
+    }
+
+    Ok((sum_sq, evaluation))
+}
+
 /// Fit a curve using the Levenberg-Marquardt algorithm.
 ///
 /// Uses finite differences of h to calculate the jacobian. If jacobian
-/// can be found analytically, then use curve_fit_jac. Keeps iterating until
+/// can be found analytically, then use `curve_fit_jac`. Keeps iterating until
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol.
+///
+/// # Errors
+/// Returns an error if curve fitting fails.
+///
+/// # Panics
+/// Panics if a u8 can not be converted to the generic type.
 pub fn curve_fit<N, F, const V: usize>(
     mut f: F,
     xs: &[N],
@@ -144,52 +293,20 @@ where
     let mut jac_transpose = jac.transpose();
 
     // Get the initial sum of square residuals
-    let mut resid = Vec::with_capacity(xs.len());
-    for (ind, &x) in xs.iter().enumerate() {
-        resid.push(ys[ind] - f(x, &params));
-    }
-    let sum_sq_initial: N::RealField = resid
-        .iter()
-        .map(|&r| r.modulus_squared())
-        .fold(N::RealField::zero(), |acc, r| acc + r);
-
-    // Get initial factor
-    let mut sum_sq = sum_sq_initial + N::RealField::one();
-    let mut damping_tmp = damping / damping_mult;
-    let mut j = 0;
-    let mut evaluation: DVector<N> =
-        DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
-    while sum_sq > sum_sq_initial && j < 1000 {
-        damping_tmp *= damping_mult;
-        let diff = &ys - &evaluation;
-        let mut b = &jac_transpose * &diff;
-        // Always square
-        let mut multiplied = &jac_transpose * &jac;
-        for i in 0..multiplied.row(0).len() {
-            multiplied[(i, i)] *= N::one() + N::from_real(damping_tmp);
-        }
-        let lu = multiplied.clone().lu();
-        let solved = lu.solve_mut(&mut b);
-        if !solved {
-            return Err("curve_fit: unable to solve linear equation".to_owned());
-        }
-        params += &b;
-        evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
-        let diff = &ys - &evaluation;
-        sum_sq = diff
-            .iter()
-            .map(|&r| r.modulus_squared())
-            .fold(N::RealField::zero(), |acc, r| acc + r);
-        j += 1;
-        jac_finite_differences(&mut f, xs, &mut params, &mut jac, h);
-        jac_transpose = jac.transpose();
-    }
-    if j != 1000 {
-        damping = damping_tmp;
-    }
+    let (mut sum_sq, mut evaluation) = initial_residuals(
+        xs,
+        &ys,
+        &mut damping,
+        damping_mult,
+        h,
+        &mut f,
+        &mut jac,
+        &mut jac_transpose,
+        params,
+    )?;
 
     let mut last_sum_sq = sum_sq;
-    sum_sq += N::from_i32(2).unwrap().real() * tol;
+    sum_sq += N::from_u8(2).unwrap().real() * tol;
     while (last_sum_sq - sum_sq).abs() > tol {
         last_sum_sq = sum_sq;
         // Get right side of iteration equation
@@ -204,11 +321,11 @@ where
         }
         // Solve equation with LU w/ partial pivoting first
         let lu = multiplied.clone().lu();
-        let solved = lu.solve_mut(&mut b);
-        if !solved {
+        let lu_solved = lu.solve_mut(&mut b);
+        if !lu_solved {
             return Err("curve_fit: unable to solve linear equation".to_owned());
         }
-        let new_params = &params + &b;
+        let new_params = params + &b;
 
         // Now solve for damping / damping_mult
         for i in 0..multiplied_div.row(0).len() {
@@ -218,16 +335,16 @@ where
         let solved = lu.solve_mut(&mut b_div);
         if !solved {
             let lu = multiplied_div.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b_div);
-            if !solved {
+            let full_lu_solved = lu.solve_mut(&mut b_div);
+            if !full_lu_solved {
                 let qr = multiplied_div.qr();
-                let solved = qr.solve_mut(&mut b_div);
-                if !solved {
+                let qr_solved = qr.solve_mut(&mut b_div);
+                if !qr_solved {
                     return Err("curve_fit: unable to solve linear equation".to_owned());
                 }
             }
         }
-        let new_params_div = &params + &b_div;
+        let new_params_div = params + &b_div;
 
         // get residuals for each of the new solutions
         evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &new_params)));
@@ -268,6 +385,12 @@ where
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol. Jacobian should be a function that returns a column vector
 /// where jacobian[i] is the partial derivative of f with respect to param[i].
+///
+/// # Errors
+/// Returns an error if curve fit fails.
+///
+/// # Panics
+/// Panics if a u8 can not be converted to the generic type.
 pub fn curve_fit_jac<N, F, G, const V: usize>(
     mut f: F,
     xs: &[N],
@@ -304,61 +427,20 @@ where
     jac_analytic(&mut jacobian, xs, &mut params, &mut jac);
     let mut jac_transpose = jac.transpose();
 
-    // Get the initial sum of square residuals
-    let mut resid = Vec::with_capacity(xs.len());
-    for (ind, &x) in xs.iter().enumerate() {
-        resid.push(ys[ind] - f(x, &params));
-    }
-    let sum_sq_initial: N::RealField = resid
-        .iter()
-        .map(|&r| r.modulus_squared())
-        .fold(N::RealField::zero(), |acc, r| acc + r);
-
-    // Get initial factor
-    let mut sum_sq = sum_sq_initial + N::RealField::one();
-    let mut damping_tmp = damping / damping_mult;
-    let mut j = 0;
-    let mut evaluation: DVector<N> =
-        DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
-    while sum_sq > sum_sq_initial && j < 1000 {
-        damping_tmp *= damping_mult;
-        let diff = &ys - &evaluation;
-        let mut b = &jac_transpose * &diff;
-        // Always square
-        let mut multiplied = &jac_transpose * &jac;
-        for i in 0..multiplied.row(0).len() {
-            multiplied[(i, i)] *= N::one() + N::from_real(damping_tmp);
-        }
-        let lu = multiplied.clone().lu();
-        let solved = lu.solve_mut(&mut b);
-        if !solved {
-            let lu = multiplied.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b);
-            if !solved {
-                let qr = multiplied.qr();
-                let solved = qr.solve_mut(&mut b);
-                if !solved {
-                    return Err("curve_fit_jac: unable to solve linear equation".to_owned());
-                }
-            }
-        }
-        params += &b;
-        evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &params)));
-        let diff = &ys - &evaluation;
-        sum_sq = diff
-            .iter()
-            .map(|&r| r.modulus_squared())
-            .fold(N::RealField::zero(), |acc, r| acc + r);
-        j += 1;
-        jac_analytic(&mut jacobian, xs, &mut params, &mut jac);
-        jac_transpose = jac.transpose();
-    }
-    if j != 1000 {
-        damping = damping_tmp;
-    }
+    let (mut sum_sq, mut evaluation) = initial_residuals_exact(
+        xs,
+        &ys,
+        &mut damping,
+        damping_mult,
+        &mut f,
+        &mut jacobian,
+        &mut jac,
+        &mut jac_transpose,
+        params,
+    )?;
 
     let mut last_sum_sq = sum_sq;
-    sum_sq += N::from_i32(2).unwrap().real() * tol;
+    sum_sq += N::from_u8(2).unwrap().real() * tol;
     while (last_sum_sq - sum_sq).abs() > tol {
         last_sum_sq = sum_sq;
         // Get right side of iteration equation
@@ -374,19 +456,19 @@ where
         // Solve equation with LU w/ partial pivoting first
         // Then try LU w/ Full pivoting, QR
         let lu = multiplied.clone().lu();
-        let solved = lu.solve_mut(&mut b);
-        if !solved {
+        let lu_solved = lu.solve_mut(&mut b);
+        if !lu_solved {
             let lu = multiplied.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b);
-            if !solved {
+            let full_lu_solved = lu.solve_mut(&mut b);
+            if !full_lu_solved {
                 let qr = multiplied.qr();
-                let solved = qr.solve_mut(&mut b);
-                if !solved {
+                let qr_solved = qr.solve_mut(&mut b);
+                if !qr_solved {
                     return Err("curve_fit_jac: unable to solve linear equation".to_owned());
                 }
             }
         }
-        let new_params = &params + &b;
+        let new_params = params + &b;
 
         // Now solve for damping / damping_mult
         for i in 0..multiplied_div.row(0).len() {
@@ -396,16 +478,16 @@ where
         let solved = lu.solve_mut(&mut b_div);
         if !solved {
             let lu = multiplied_div.clone().full_piv_lu();
-            let solved = lu.solve_mut(&mut b_div);
-            if !solved {
+            let full_lu_solved = lu.solve_mut(&mut b_div);
+            if !full_lu_solved {
                 let qr = multiplied_div.qr();
-                let solved = qr.solve_mut(&mut b_div);
-                if !solved {
+                let qr_solved = qr.solve_mut(&mut b_div);
+                if !qr_solved {
                     return Err("curve_fit_jac: unable to solve linear equation".to_owned());
                 }
             }
         }
-        let new_params_div = &params + &b_div;
+        let new_params_div = params + &b_div;
 
         // get residuals for each of the new solutions
         evaluation = DVector::from_iterator(xs.len(), xs.iter().map(|&x| f(x, &new_params)));
