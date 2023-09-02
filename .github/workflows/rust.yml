@@ -13,55 +13,39 @@ jobs:
     name: Build library
     strategy:
       matrix:
-        # TODO: Features
         os: [ubuntu-latest, macos-latest, windows-latest]
         profile: [dev, release]
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          submodules: recursive
-        
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          profile: minimal
-        
-      - uses: Swatinem/rust-cache@v1
+          key: ${{ matrix.profile }}
 
       - name: Build
-        uses: actions-rs/cargo@v1
+        uses: clechasseur/rs-cargo@v1
         with:
           command: build
           args: --profile ${{ matrix.profile }}
 
   clippy:
     name: Cargo clippy
-    strategy:
-      matrix:
-        profile: [dev, release]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          submodules: recursive
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          profile: minimal
           components: clippy
-
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Run Clippy
-        uses: actions-rs/cargo@v1
+        uses: auguwu/clippy-action@1.2.2
         with:
-          command: clippy
-          args: --profile ${{ matrix.profile }} --all-targets --all-features -- --deny=warnings
+          all-features: true
+          deny: warnings
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   test:
     name: Cargo nextest
@@ -70,24 +54,17 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-        with:
-          recursive: true
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          profile: minimal
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-nextest
-        uses: actions-rs/cargo@v1
+        uses: baptiste0928/cargo-install@v2
         with:
-          command: install
-          args: cargo-nextest
+          crate: cargo-nextest
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
+        uses: clechasseur/rs-cargo@v1
         with:
           command: nextest
           args: run
