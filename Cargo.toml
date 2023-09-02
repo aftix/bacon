@@ -1,6 +1,6 @@
 [package]
 name = "bacon-sci"
-version = "0.13.1"
+version = "0.14.0"
 authors = ["aftix <aftix@aftix.xyz>"]
 edition = "2021"
 license="MIT"
@@ -12,15 +12,15 @@ keywords=["numeric", "science", "integration", "quadrature"]
 categories=["science"]
 
 [dev-dependencies]
-float-cmp="0.8"
+float-cmp="0.9"
 rand="0.8"
 
 [dependencies]
-nalgebra="=0.29.0"
-typenum="=1.14"
-num-complex="=0.4.0"
-num-traits="=0.2.14"
-phf = "=0.8"
+nalgebra="0.32"
+typenum="1.14"
+num-complex="0.4"
+num-traits="0.2"
+phf = "0.11"
 
 [build-dependencies]
-phf_codegen = "0.8"
+phf_codegen = "0.11"
