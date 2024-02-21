@@ -18,14 +18,14 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.profile }}
 
       - name: Build
-        uses: clechasseur/rs-cargo@v1
+        uses: clechasseur/rs-cargo@v2
         with:
           command: build
           args: --profile ${{ matrix.profile }}
@@ -34,14 +34,14 @@ jobs:
     name: Cargo clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
 
       - name: Run Clippy
-        uses: auguwu/clippy-action@1.2.2
+        uses: auguwu/clippy-action@1.3.0
         with:
           all-features: true
           deny: warnings
@@ -54,7 +54,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -64,7 +64,7 @@ jobs:
           crate: cargo-nextest
 
       - name: Run tests
-        uses: clechasseur/rs-cargo@v1
+        uses: clechasseur/rs-cargo@v2
         with:
           command: nextest
           args: run
