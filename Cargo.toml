@@ -17,7 +17,7 @@ rand="0.8"
 
 [dependencies]
 nalgebra="0.32"
-typenum="1.14"
+typenum="1.17"
 num-complex="0.4"
 num-traits="0.2"
 phf = "0.11"
