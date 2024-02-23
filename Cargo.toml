@@ -21,6 +21,7 @@ typenum="1.17"
 num-complex="0.4"
 num-traits="0.2"
 phf = "0.11"
+thiserror = "1.0"
 
 [build-dependencies]
 phf_codegen = "0.11"
