@@ -1,0 +1,74 @@
+name: Release bacon-sci
+
+on:
+  workflow_run:
+    workflows: [Rust]
+    branches: [master]
+    tags: ['v*']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: The branch to release from
+        default: master
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Release bacon-sci to crates.io
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-tags: true
+          fetch-depth: 0
+      - name: Ensure Cargo.toml version matches git tag
+        run: |-
+          CARGO_TOML_VERSION="$(awk -F= '/^\s*version =/ && !a++ { print $2 }' Cargo.toml | tr -d ' "')"
+          GIT_TAG="$(git tag --points-at ${{ github.event.workflow_run.head_sha }})"
+          if [[ "v$CARGO_TOML_VERSION" = "$GIT_TAG" ]]; then
+            echo "::notice::Cargo crate version matches tag"
+          else
+            echo "::error::Cargo crate version $CARGO_TOML_VERSION does not match tag $GIT_TAG"
+            exit 1
+          fi
+
+      # Installs the toolchain
+      - name: Check that semver is correctly changed
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+      - name: Remove generated files
+        run: rm -rf semver* target/
+
+      - name: Publish crate
+        uses: clechasseur/rs-cargo@v2
+        with:
+          command: publish
+          args: --token ${{ secrets.CRATES_IO_TOKEN }}
+
+  release-dispatch:
+    name: Manually release bacon-sci to crates.io
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      # Installs the toolchain
+      - name: Check that semver is correctly changed
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+      - name: Remove generated files
+        run: rm -rf semver* target/
+
+      - name: Publish crate
+        uses: clechasseur/rs-cargo@v2
+        with:
+          command: publish
+          args: --token ${{ secrets.CRATES_IO_TOKEN }}
