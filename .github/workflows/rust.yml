@@ -3,6 +3,7 @@ name: Rust
 on:
   push:
     branches: [master]
+    tags: ['*']
   pull_request:
 
 env:
@@ -59,7 +60,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-nextest
-        uses: baptiste0928/cargo-install@v2
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-nextest
 
