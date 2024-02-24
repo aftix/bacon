@@ -6,7 +6,8 @@ on:
     branches: [master]
   
 jobs:
-  build:
+  spell-check:
+    name: Check spelling in docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
