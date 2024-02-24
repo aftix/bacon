@@ -11,12 +11,7 @@ use thiserror::Error;
 
 pub mod adams;
 pub mod bdf;
-/*
-mod bdf;
-mod rk;
-pub use adams::*;
-pub use bdf::*;
-pub use rk::*;*/
+pub mod rk;
 
 /// Status returned from the IVPStepper
 /// Used by the IVPIterator struct to correctly step through
