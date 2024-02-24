@@ -4,729 +4,878 @@
  * See repository LICENSE for information.
  */
 
-use super::{IVPSolver, IVPStatus};
+use super::{Derivative, IVPError, IVPIterator, IVPSolver, IVPStatus, IVPStepper, Step};
 use nalgebra::{ComplexField, RealField, SVector};
-use num_traits::{FromPrimitive, Zero};
+use num_traits::{FromPrimitive, One, Zero};
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 
-/// This trait allows a struct to be used in the Adams Predictor-Corrector solver
-///
-/// Things implementing AdamsSolver should have an AdamsInfo to handle the actual
-/// IVP solving.
-///
-/// # Examples
-/// See `struct Adams` for an example of implementing this trait
-pub trait AdamsSolver<N, const S: usize, const O: usize>: Sized
-where
-    N: ComplexField,
-{
+/// This trait defines an Adams predictor-corrector solver
+/// The Adams struct takes an implemetation of this trait
+/// as a type argument since the algorithm is the same for
+/// all the predictor correctors, just the order and these functions
+/// need to be different.
+pub trait AdamsCoefficients<const O: usize> {
+    /// The real field associated with the solver's Field.
+    type RealField: RealField;
+
     /// The polynomial interpolation coefficients for the predictor. Should start
     /// with the coefficient for n - 1
-    fn predictor_coefficients() -> SVector<N::RealField, O>;
+    fn predictor_coefficients() -> Option<SVector<Self::RealField, O>>;
+
     /// The polynomial interpolation coefficients for the corrector. Must be
     /// the same length as predictor_coefficients. Should start with the
     /// implicit coefficient.
-    fn corrector_coefficients() -> SVector<N::RealField, O>;
+    fn corrector_coefficients() -> Option<SVector<Self::RealField, O>>;
+
     /// Coefficient for multiplying error by.
-    fn error_coefficient() -> N::RealField;
-
-    /// Use AdamsInfo to solve an initial value problem
-    fn solve_ivp<T, F>(self, f: F, params: &mut T) -> super::Path<N, N::RealField, S>
-    where
-        T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>;
-
-    /// Set the error tolerance for this solver.
-    fn with_tolerance(self, tol: N::RealField) -> Result<Self, String>;
-    /// Set the maximum time step for this solver.
-    fn with_dt_max(self, max: N::RealField) -> Result<Self, String>;
-    /// Set the minimum time step for this solver.
-    fn with_dt_min(self, min: N::RealField) -> Result<Self, String>;
-    /// Set the initial time for this solver.
-    fn with_start(self, t_initial: N::RealField) -> Result<Self, String>;
-    /// Set the end time for this solver.
-    fn with_end(self, t_final: N::RealField) -> Result<Self, String>;
-    /// Set the initial conditions for this solver.
-    fn with_initial_conditions(self, start: &[N]) -> Result<Self, String>;
-    /// Build this solver.
-    fn build(self) -> Self;
+    fn error_coefficient() -> Option<Self::RealField>;
 }
 
-/// Provides an IVPSolver implementation for AdamsSolver, based on
-/// the predictor and correctorr coefficients. It is up to the AdamsSolver
-/// to set up AdamsInfo with the correct coefficients.
-#[derive(Debug, Clone)]
-pub struct AdamsInfo<N, const S: usize, const O: usize>
+/// The nuts and bolts Adams solver
+/// Users won't use this directly if they aren't defining their own Adams predictor-corrector
+/// Used as a common struct for the specific implementations
+pub struct Adams<'a, N, const S: usize, const O: usize, T, F, A>
 where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
+    N: ComplexField + Copy,
+    T: Clone,
+    F: Derivative<N, S, T> + 'a,
+    A: AdamsCoefficients<O, RealField = N::RealField>,
 {
-    dt: Option<N::RealField>,
-    time: Option<N::RealField>,
-    end: Option<N::RealField>,
-    state: Option<SVector<N, S>>,
-    dt_max: Option<N::RealField>,
-    dt_min: Option<N::RealField>,
-    tolerance: Option<N::RealField>,
+    init_dt_max: Option<N::RealField>,
+    init_dt_min: Option<N::RealField>,
+    init_time: Option<N::RealField>,
+    init_end: Option<N::RealField>,
+    init_tolerance: Option<N::RealField>,
+    init_state: Option<SVector<N, S>>,
+    init_derivative: Option<F>,
+    _data: PhantomData<&'a (T, A)>,
+}
+
+/// The solver for any Adams predictor-corrector
+/// Users should not use this type directly, and should
+/// instead get it from a specific Adams method struct
+/// (wrapped in an IVPIterator)
+pub struct AdamsSolver<'a, N, const S: usize, const O: usize, T, F>
+where
+    N: ComplexField + Copy,
+    T: Clone,
+    F: Derivative<N, S, T> + 'a,
+{
+    // Parameters set by the user
+    dt_max: N,
+    dt_min: N,
+    time: N,
+    end: N,
+    tolerance: N,
+    derivative: F,
+    data: T,
+
+    // Current solution at t = self.time
+    dt: N,
+    state: SVector<N, S>,
+
+    // Per-order constants set by an AdamsCoefficients
     predictor_coefficients: SVector<N, O>,
     corrector_coefficients: SVector<N, O>,
-    error_coefficient: N::RealField,
-    memory: VecDeque<SVector<N, S>>,
-    states: VecDeque<(N::RealField, SVector<N, S>)>,
-    nflag: bool,
-    last: bool,
+    error_coefficient: N,
+
+    // Previous steps to interpolate with
+    prev_values: VecDeque<(N::RealField, SVector<N, S>)>,
+    prev_derivatives: VecDeque<SVector<N, S>>,
+
+    // A scratch vector to use during the algorithm (to avoid allocating & de-allocating every step)
+    scratch_pad: SVector<N, S>,
+    // Another scratch vector, used to store values for the implicit step
+    implicit_derivs: SVector<N, S>,
+    // A place to store solver state while taking speculative steps trying to find a good timestep
+    save_state: SVector<N, S>,
+
+    // Constants for the particular field
+    one_tenth: N,
+    one_sixth: N,
+    half: N,
+    two: N,
+    four: N,
+
+    // generic parameter O in the type N
+    order: N,
+
+    // The number of items in prev_values that need to be yielded to the iterator
+    // due to a previous runge-kutta step
+    yield_memory: usize,
+
+    _lifetime: PhantomData<&'a ()>,
 }
 
-impl<N, const S: usize, const O: usize> AdamsInfo<N, S, O>
+impl<'a, N, const S: usize, const O: usize, T, F, A> Default for Adams<'a, N, S, O, T, F, A>
 where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    pub fn new() -> Self {
-        AdamsInfo {
-            dt: None,
-            time: None,
-            end: None,
-            state: None,
-            dt_max: None,
-            dt_min: None,
-            tolerance: None,
-            predictor_coefficients: SVector::<N, O>::zero(),
-            corrector_coefficients: SVector::<N, O>::zero(),
-            error_coefficient: N::RealField::zero(),
-            memory: VecDeque::new(),
-            states: VecDeque::new(),
-            nflag: false,
-            last: false,
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn rk4<N, T, F, const S: usize>(
-    time: N::RealField,
-    dt: N::RealField,
-    initial: &[N],
-    states: &mut VecDeque<(N::RealField, SVector<N, S>)>,
-    derivs: &mut VecDeque<SVector<N, S>>,
-    mut f: F,
-    params: &mut T,
-    num: usize,
-) -> Result<(), String>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
+    N: ComplexField + Copy,
     T: Clone,
-    F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
-{
-    let mut state: SVector<N, S> = SVector::from_column_slice(initial);
-    let mut time = time;
-    for i in 0..num {
-        let k1 = f(time, state.as_slice(), &mut params.clone())? * N::from_real(dt);
-        let intermediate = state + k1 * N::from_f64(0.5).unwrap();
-        let k2 = f(
-            time + N::RealField::from_f64(0.5).unwrap() * dt,
-            intermediate.as_slice(),
-            &mut params.clone(),
-        )? * N::from_real(dt);
-        let intermediate = state + k2 * N::from_f64(0.5).unwrap();
-        let k3 = f(
-            time + N::RealField::from_f64(0.5).unwrap() * dt,
-            intermediate.as_slice(),
-            &mut params.clone(),
-        )? * N::from_real(dt);
-        let intermediate = state + k3;
-        let k4 = f(time + dt, intermediate.as_slice(), &mut params.clone())? * N::from_real(dt);
-        if i != 0 {
-            derivs.push_back(f(time, state.as_slice(), params)?);
-            states.push_back((time, state));
-        }
-        state += (k1 + k2 * N::from_f64(2.0).unwrap() + k3 * N::from_f64(2.0).unwrap() + k4)
-            * N::from_f64(1.0 / 6.0).unwrap();
-        time += dt;
-    }
-    derivs.push_back(f(time, state.as_slice(), params)?);
-    states.push_back((time, state));
-
-    Ok(())
-}
-
-impl<N, const S: usize, const O: usize> Default for AdamsInfo<N, S, O>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
+    F: Derivative<N, S, T> + 'a,
+    A: AdamsCoefficients<O, RealField = N::RealField>,
 {
     fn default() -> Self {
-        Self::new()
+        Self {
+            init_dt_max: None,
+            init_dt_min: None,
+            init_time: None,
+            init_end: None,
+            init_tolerance: None,
+            init_state: None,
+            init_derivative: None,
+            _data: PhantomData,
+        }
     }
 }
 
-impl<N, const S: usize, const O: usize> IVPSolver<N, S> for AdamsInfo<N, S, O>
+impl<'a, N, const S: usize, const O: usize, T, F, A> IVPSolver<'a, S>
+    for Adams<'a, N, S, O, T, F, A>
 where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
+    N: ComplexField + Copy,
+    T: Clone,
+    F: Derivative<N, S, T> + 'a,
+    A: AdamsCoefficients<O, RealField = N::RealField>,
 {
-    fn step<T, F>(&mut self, mut f: F, params: &mut T) -> Result<IVPStatus<N, S>, String>
-    where
-        T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
-    {
-        if self.time.unwrap() >= self.end.unwrap() {
-            return Ok(IVPStatus::Done);
-        }
+    type Error = IVPError;
+    type Field = N;
+    type RealField = N::RealField;
+    type Derivative = F;
+    type UserData = T;
+    type Solver = AdamsSolver<'a, N, S, O, T, F>;
 
-        let mut output = vec![];
-
-        if self.time.unwrap() + self.dt.unwrap() >= self.end.unwrap() {
-            self.dt = Some(self.end.unwrap() - self.time.unwrap());
-            rk4(
-                self.time.unwrap(),
-                self.dt.unwrap(),
-                self.state.as_ref().unwrap().as_slice(),
-                &mut self.states,
-                &mut self.memory,
-                &mut f,
-                params,
-                1,
-            )?;
-            *self.time.get_or_insert(N::RealField::zero()) += self.dt.unwrap();
-            return Ok(IVPStatus::Ok(vec![(
-                self.time.unwrap(),
-                self.states.back().unwrap().1,
-            )]));
-        }
-
-        if self.memory.is_empty() {
-            rk4(
-                self.time.unwrap(),
-                self.dt.unwrap(),
-                self.state.as_ref().unwrap().as_slice(),
-                &mut self.states,
-                &mut self.memory,
-                &mut f,
-                params,
-                self.predictor_coefficients.len() - 1,
-            )?;
-            self.time = Some(
-                self.time.unwrap()
-                    + N::RealField::from_usize(self.predictor_coefficients.len() - 1).unwrap()
-                        * self.dt.unwrap(),
-            );
-            self.state = Some(self.states.back().unwrap().1);
-        }
-
-        let tenth_real = N::RealField::from_f64(0.1).unwrap();
-        let two_real = N::RealField::from_i32(2).unwrap();
-        let four_real = N::RealField::from_i32(4).unwrap();
-
-        let wp = &self.state.as_ref().unwrap();
-        let wp =
-            SVector::<N, S>::from_iterator(wp.as_slice().iter().enumerate().map(|(ind, y)| {
-                let mut acc = *y;
-                let dt = N::from_real(self.dt.unwrap());
-                for (j, mem) in self.memory.iter().enumerate() {
-                    acc += mem[ind]
-                        * self.predictor_coefficients[self.predictor_coefficients.len() - j - 2]
-                        * dt;
-                }
-                acc
-            }));
-
-        let implicit = f(
-            self.time.unwrap() + self.dt.unwrap(),
-            wp.as_slice(),
-            &mut params.clone(),
-        )?;
-        let wc = &self.state.as_ref().unwrap();
-        let wc =
-            SVector::<N, S>::from_iterator(wc.as_slice().iter().enumerate().map(|(ind, y)| {
-                let dt = N::from_real(self.dt.unwrap());
-                let mut acc = implicit[ind] * self.corrector_coefficients[0] * dt;
-                for (j, mem) in self.memory.iter().enumerate() {
-                    acc += mem[ind]
-                        * self.corrector_coefficients[self.corrector_coefficients.len() - j - 1]
-                        * dt;
-                }
-                acc + *y
-            }));
-
-        let diff = wc - wp;
-        let error = self.error_coefficient / self.dt.unwrap() * diff.dot(&diff).sqrt().abs();
-
-        if error <= self.tolerance.unwrap() {
-            self.state = Some(wc);
-            self.time = Some(self.time.unwrap() + self.dt.unwrap());
-            if self.nflag {
-                for state in self.states.iter() {
-                    output.push((state.0, state.1));
-                }
-                self.nflag = false;
-            }
-            output.push((self.time.unwrap(), *self.state.as_ref().unwrap()));
-
-            self.memory.push_back(implicit);
-            self.states
-                .push_back((self.time.unwrap(), *self.state.as_ref().unwrap()));
-            self.memory.pop_front();
-            self.states.pop_front();
-
-            if self.last {
-                return Ok(IVPStatus::Ok(output));
-            }
-
-            if error < tenth_real * self.tolerance.unwrap()
-                || self.time.unwrap() > self.end.unwrap()
-            {
-                let q = (self.tolerance.unwrap() / (two_real * error)).powf(
-                    N::RealField::from_f64(1.0 / self.predictor_coefficients.len() as f64).unwrap(),
-                );
-                if q > four_real {
-                    self.dt = Some(self.dt.unwrap() * four_real);
-                } else {
-                    self.dt = Some(self.dt.unwrap() * q);
-                }
-
-                if self.dt.unwrap() > self.dt_max.unwrap() {
-                    self.dt = Some(self.dt_max.unwrap());
-                }
-
-                if self.time.unwrap()
-                    + N::RealField::from_usize(self.predictor_coefficients.len()).unwrap()
-                        * self.dt.unwrap()
-                    > self.end.unwrap()
-                {
-                    self.dt = Some(
-                        (self.end.unwrap() - self.time.unwrap())
-                            / N::RealField::from_usize(self.predictor_coefficients.len()).unwrap(),
-                    );
-                    self.last = true;
-                }
-
-                self.memory.clear();
-                self.states.clear();
-            }
-
-            return Ok(IVPStatus::Ok(output));
-        }
-
-        let q = (self.tolerance.unwrap() / (N::RealField::from_f64(2.0).unwrap() * error)).powf(
-            N::RealField::from_f64(1.0 / (self.predictor_coefficients.len() as f64)).unwrap(),
-        );
-
-        if q < tenth_real {
-            self.dt = Some(self.dt.unwrap() * tenth_real);
-        } else {
-            self.dt = Some(self.dt.unwrap() * q);
-        }
-
-        if self.dt.unwrap() < self.dt_min.unwrap() {
-            return Err("AdamsInfo step: minimum dt exceeded".to_owned());
-        }
-
-        self.memory.clear();
-        self.states.clear();
-        Ok(IVPStatus::Redo)
+    fn new() -> Self {
+        Self::default()
     }
 
-    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
-        if !tol.is_sign_positive() {
-            return Err("AdamsInfo with_tolerance: tolerance must be postive".to_owned());
+    fn with_tolerance(mut self, tol: Self::RealField) -> Result<Self, Self::Error> {
+        if tol <= <Self::RealField as Zero>::zero() {
+            return Err(IVPError::ToleranceOOB);
         }
-        self.tolerance = Some(tol);
+        self.init_tolerance = Some(tol);
         Ok(self)
     }
 
-    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
-        if !max.is_sign_positive() {
-            return Err("AdamsInfo with_dt_max: dt_max must be positive".to_owned());
+    /// Will overwrite any previously set value
+    /// If the provided maximum is less than a previously set minimum, then the minimum
+    /// is set to this value as well.
+    fn with_maximum_dt(mut self, max: Self::RealField) -> Result<Self, Self::Error> {
+        if max <= <Self::RealField as Zero>::zero() {
+            return Err(IVPError::TimeDeltaOOB);
         }
-        if let Some(min) = self.dt_min {
-            if max <= min {
-                return Err("AdamsInfo with_dt_max: dt_max must be greater than dt_min".to_owned());
+
+        self.init_dt_max = Some(max.clone());
+        if let Some(dt_min) = self.init_dt_min.as_mut() {
+            if *dt_min > max {
+                *dt_min = max;
             }
         }
-        self.dt_max = Some(max);
-        self.dt = Some(max);
+
         Ok(self)
     }
 
-    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
-        if !min.is_sign_positive() {
-            return Err("AdamsInfo with_dt_min: dt_min must be positive".to_owned());
+    /// Will overwrite any previously set value
+    /// If the provided minimum is greatear than a previously set maximum, then the maximum
+    /// is set to this value as well.
+    fn with_minimum_dt(mut self, min: Self::RealField) -> Result<Self, Self::Error> {
+        if min <= <Self::RealField as Zero>::zero() {
+            return Err(IVPError::TimeDeltaOOB);
         }
-        if let Some(max) = self.dt_max {
-            if min >= max {
-                return Err("AdamsInfo with_dt_min: dt_min must be less than dt_max".to_owned());
+
+        self.init_dt_min = Some(min.clone());
+        if let Some(dt_max) = self.init_dt_max.as_mut() {
+            if *dt_max < min {
+                *dt_max = min;
             }
         }
-        self.dt_min = Some(min);
+
         Ok(self)
     }
 
-    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
-        if let Some(end) = self.end {
-            if end <= t_initial {
-                return Err("AdamsInfo with_start: Start must be before end".to_owned());
+    fn with_initial_time(mut self, initial: Self::RealField) -> Result<Self, Self::Error> {
+        self.init_time = Some(initial.clone());
+
+        if let Some(end) = self.init_end.as_ref() {
+            if *end <= initial {
+                return Err(IVPError::TimeStartOOB);
             }
         }
-        self.time = Some(t_initial);
+
         Ok(self)
     }
 
-    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
-        if let Some(start) = self.time {
-            if t_final <= start {
-                return Err("AdamsInfo with_end: Start must be before end".to_owned());
+    fn with_ending_time(mut self, ending: Self::RealField) -> Result<Self, Self::Error> {
+        self.init_end = Some(ending.clone());
+
+        if let Some(initial) = self.init_time.as_ref() {
+            if *initial >= ending {
+                return Err(IVPError::TimeEndOOB);
             }
         }
-        self.end = Some(t_final);
+
         Ok(self)
     }
 
-    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.state = Some(SVector::<N, S>::from_column_slice(start));
+    fn with_initial_conditions(
+        mut self,
+        start: SVector<Self::Field, S>,
+    ) -> Result<Self, Self::Error> {
+        self.init_state = Some(start);
         Ok(self)
     }
 
-    fn build(self) -> Self {
+    fn with_derivative(mut self, derivative: Self::Derivative) -> Self {
+        self.init_derivative = Some(derivative);
         self
     }
 
-    fn get_initial_conditions(&self) -> Option<SVector<N, S>> {
-        self.state.as_ref().copied()
-    }
+    fn solve(self, data: Self::UserData) -> Result<IVPIterator<S, Self::Solver>, Self::Error> {
+        let dt_max = self.init_dt_max.ok_or(IVPError::MissingParameters)?;
+        let dt_min = self.init_dt_min.ok_or(IVPError::MissingParameters)?;
+        let tolerance = self.init_tolerance.ok_or(IVPError::MissingParameters)?;
+        let time = self.init_time.ok_or(IVPError::MissingParameters)?;
+        let end = self.init_end.ok_or(IVPError::MissingParameters)?;
+        let state = self.init_state.ok_or(IVPError::MissingParameters)?;
+        let derivative = self.init_derivative.ok_or(IVPError::MissingParameters)?;
 
-    fn get_time(&self) -> Option<N::RealField> {
-        self.time.as_ref().copied()
-    }
+        let two = Self::Field::from_u8(2).ok_or(IVPError::FromPrimitiveFailure)?;
+        let half = two.recip();
+        let one_sixth = Self::Field::from_u8(6)
+            .ok_or(IVPError::FromPrimitiveFailure)?
+            .recip();
+        let one_tenth = Self::Field::from_u8(10)
+            .ok_or(IVPError::FromPrimitiveFailure)?
+            .recip();
+        let four = two * two;
 
-    fn check_start(&self) -> Result<(), String> {
-        if self.time.is_none() {
-            Err("AdamsInfo check_start: No initial time".to_owned())
-        } else if self.end.is_none() {
-            Err("AdamsInfo check_start: No end time".to_owned())
-        } else if self.tolerance.is_none() {
-            Err("AdamsInfo check_start: No tolerance".to_owned())
-        } else if self.state.is_none() {
-            Err("AdamsInfo check_start: No initial conditions".to_owned())
-        } else if self.dt_max.is_none() {
-            Err("AdamsInfo check_start: No dt_max".to_owned())
-        } else if self.dt_min.is_none() {
-            Err("AdamsInfo check_start: No dt_min".to_owned())
-        } else {
-            Ok(())
+        let predictor_coefficients = SVector::from_iterator(
+            A::predictor_coefficients()
+                .ok_or(IVPError::FromPrimitiveFailure)?
+                .as_slice()
+                .iter()
+                .cloned()
+                .map(Self::Field::from_real),
+        );
+
+        let corrector_coefficients = SVector::from_iterator(
+            A::corrector_coefficients()
+                .ok_or(IVPError::FromPrimitiveFailure)?
+                .as_slice()
+                .iter()
+                .cloned()
+                .map(Self::Field::from_real),
+        );
+
+        let order = Self::Field::from_usize(O).ok_or(IVPError::FromPrimitiveFailure)?;
+
+        Ok(IVPIterator {
+            solver: AdamsSolver {
+                dt_max: Self::Field::from_real(dt_max.clone()),
+                dt_min: Self::Field::from_real(dt_min.clone()),
+                time: Self::Field::from_real(time),
+                end: Self::Field::from_real(end),
+                tolerance: Self::Field::from_real(tolerance),
+                dt: Self::Field::from_real(dt_max + dt_min) * half,
+                state,
+                derivative,
+                data,
+                predictor_coefficients,
+                corrector_coefficients,
+                error_coefficient: Self::Field::from_real(
+                    A::error_coefficient().ok_or(IVPError::FromPrimitiveFailure)?,
+                ),
+                prev_values: VecDeque::new(),
+                prev_derivatives: VecDeque::new(),
+                scratch_pad: SVector::zero(),
+                implicit_derivs: SVector::zero(),
+                save_state: SVector::zero(),
+                one_tenth,
+                one_sixth,
+                half,
+                two,
+                four,
+                order,
+                yield_memory: 0,
+                _lifetime: PhantomData,
+            },
+            finished: false,
+        })
+    }
+}
+
+impl<'a, N, const S: usize, const O: usize, T, F> AdamsSolver<'a, N, S, O, T, F>
+where
+    N: ComplexField + Copy,
+    T: Clone,
+    F: Derivative<N, S, T> + 'a,
+{
+    fn runge_kutta(&mut self, iterations: usize) -> Result<(), IVPError> {
+        for i in 0..iterations {
+            let k1 = (self.derivative)(
+                self.time.real(),
+                self.state.as_slice(),
+                &mut self.data.clone(),
+            )? * self.dt;
+            let intermediate = self.state + k1 * self.half;
+
+            let k2 = (self.derivative)(
+                (self.time + self.half * self.dt).real(),
+                intermediate.as_slice(),
+                &mut self.data.clone(),
+            )? * self.dt;
+            let intermediate = self.state + k2 * self.half;
+
+            let k3 = (self.derivative)(
+                (self.time + self.half * self.dt).real(),
+                intermediate.as_slice(),
+                &mut self.data.clone(),
+            )? * self.dt;
+            let intermediate = self.state + k3;
+
+            let k4 = (self.derivative)(
+                (self.time + self.dt).real(),
+                intermediate.as_slice(),
+                &mut self.data.clone(),
+            )? * self.dt;
+
+            if i != 0 {
+                self.prev_derivatives.push_back((self.derivative)(
+                    self.time.real(),
+                    self.state.as_slice(),
+                    &mut self.data,
+                )?);
+                self.prev_values.push_back((self.time.real(), self.state));
+            }
+
+            self.state += (k1 + k2 * self.two + k3 * self.two + k4) * self.one_sixth;
+            self.time += self.dt;
         }
+        self.prev_derivatives.push_back((self.derivative)(
+            self.time.real(),
+            self.state.as_slice(),
+            &mut self.data,
+        )?);
+        self.prev_values.push_back((self.time.real(), self.state));
+
+        Ok(())
+    }
+}
+
+impl<'a, N, const S: usize, const O: usize, T, F> IVPStepper<S> for AdamsSolver<'a, N, S, O, T, F>
+where
+    N: ComplexField + Copy,
+    T: Clone,
+    F: Derivative<N, S, T> + 'a,
+{
+    type Error = IVPError;
+    type Field = N;
+    type RealField = N::RealField;
+    type UserData = T;
+
+    fn step(&mut self) -> Step<Self::RealField, Self::Field, S, Self::Error> {
+        // If yield_memory is in [1, Order) then we have taken a runge-kutta step
+        // and committed to it (i.e. determined that we are within error bounds)
+        // If yield_memory is Order then we have taken a runge-kutta step but haven't
+        // checked if it is correct, so we don't want to yield the steps to the Iterator yet
+        if self.yield_memory > 0 && self.yield_memory < O {
+            let get_item = O - self.yield_memory - 1;
+            self.yield_memory -= 1;
+
+            // If this is the last runge-kutta step to be yielded,
+            // set yield_memory to the sentinel value O+1 so that the next step() call
+            // will yield the value in self.state (the adams step that was within
+            // tolerance after these runge-kutta steps)
+            if self.yield_memory == 0 {
+                self.yield_memory = O + 1;
+            }
+            return Ok(self.prev_values[get_item].clone());
+        }
+
+        // Sentinel value to signify that the runge-kutta steps are yielded
+        // and the solver can yield the adams step and continue as normal.
+        // The current state needs to be returned and pushed onto the memory deque.
+        // The derivatives memory deque already has the derivatives for this step,
+        // since the derivatives deque is unused while yielding runge-kutta steps
+        if self.yield_memory == O + 1 {
+            self.yield_memory = 0;
+            self.prev_values.push_back((self.time.real(), self.state));
+            self.prev_values.pop_front();
+            return Ok((self.time.real(), self.state));
+        }
+
+        if self.time.real() >= self.end.real() {
+            return Err(IVPStatus::Done);
+        }
+
+        if self.time.real() + self.dt.real() >= self.end.real() {
+            self.dt = self.end - self.time;
+            self.runge_kutta(1)?;
+            return Ok((self.time.real(), self.prev_values.back().unwrap().1));
+        }
+
+        if self.prev_values.is_empty() {
+            self.save_state = self.state;
+            if self.time.real() + self.dt.real() * (self.order - Self::Field::one()).real()
+                >= self.end.real()
+            {
+                self.dt = (self.end - self.time) / (self.order - Self::Field::one());
+            }
+            self.runge_kutta(O - 1)?;
+            self.yield_memory = O;
+
+            return Err(IVPStatus::Redo);
+        }
+
+        self.scratch_pad = self.prev_derivatives[0] * self.predictor_coefficients[O - 2];
+        for i in 1..O - 1 {
+            let coefficient = self.predictor_coefficients[O - i - 2];
+            self.scratch_pad += self.prev_derivatives[i] * coefficient;
+        }
+        let predictor = self.state + self.scratch_pad * self.dt;
+
+        self.implicit_derivs = (self.derivative)(
+            self.time.real() + self.dt.real(),
+            predictor.as_slice(),
+            &mut self.data.clone(),
+        )?;
+        self.scratch_pad = self.implicit_derivs * self.corrector_coefficients[0];
+
+        for i in 0..O - 1 {
+            let coefficient = self.corrector_coefficients[O - i - 1];
+            self.scratch_pad += self.prev_derivatives[i] * coefficient;
+        }
+        let corrector = self.state + self.scratch_pad * self.dt;
+
+        let difference = corrector - predictor;
+        let error = self.error_coefficient.real() / self.dt.real() * difference.norm();
+
+        if error <= self.tolerance.real() {
+            self.state = corrector;
+            self.time += self.dt;
+
+            // We have determined that this step passes the tolerance bounds.
+            // If yield_memory is non-zero, then we still need to yield the runge-kutta
+            // steps to the Iterator. We store the successful adams step in self.state,
+            // and self.time, decrement yield memory, and return (we never want to adjust the dt
+            // the step after adjusting it down). We return IVPStatus::Redo so IVPIterator
+            // calls again, yielding the runge-kutta steps.
+            if self.yield_memory == O {
+                self.yield_memory -= 1;
+                return Err(IVPStatus::Redo);
+            }
+
+            self.prev_derivatives.push_back(self.implicit_derivs);
+            self.prev_values.push_back((self.time.real(), self.state));
+
+            self.prev_values.pop_front();
+            self.prev_derivatives.pop_front();
+
+            if error < self.one_tenth.real() * self.tolerance.real() {
+                let q = (self.tolerance.real() / (self.two.real() * error))
+                    .powf(self.order.recip().real());
+
+                if q > self.four.real() {
+                    self.dt *= self.four;
+                } else {
+                    self.dt *= Self::Field::from_real(q);
+                }
+
+                if self.dt.real() > self.dt_max.real() {
+                    self.dt = self.dt_max;
+                }
+
+                // Clear the saved steps since we have changed the timestep
+                // so we can no longer use linear interpolation.
+                self.prev_values.clear();
+                self.prev_derivatives.clear();
+            }
+
+            return Ok((self.time.real(), self.state));
+        }
+
+        // yield_memory can be Order here, meaning we speculatively tried a timestep and the lower timestep
+        // still didn't pass the tolerances.
+        // In this case, we need to return the state to what it was previously, before the runge-kutta steps,
+        // and reset the time to what it was previously.
+        if self.yield_memory == O {
+            // We took Order - 1 runge kutta steps at this dt
+            self.time -= self.dt * (self.order - Self::Field::one());
+            self.state = self.save_state;
+        }
+
+        let q = (self.tolerance.real() / (self.two.real() * error.real()))
+            .powf(self.order.recip().real());
+
+        if q < self.one_tenth.real() {
+            self.dt *= self.one_tenth;
+        } else {
+            self.dt *= Self::Field::from_real(q);
+        }
+
+        if self.dt.real() < self.dt_min.real() {
+            return Err(IVPStatus::Failure(IVPError::MinimumTimeDeltaExceeded));
+        }
+
+        self.prev_values.clear();
+        self.prev_derivatives.clear();
+        Err(IVPStatus::Redo)
+    }
+
+    fn time(&self) -> Self::RealField {
+        self.time.real()
+    }
+}
+
+pub struct AdamsCoefficients5<N: ComplexField>(PhantomData<N>);
+
+impl<N: ComplexField> AdamsCoefficients<5> for AdamsCoefficients5<N> {
+    type RealField = N::RealField;
+
+    fn predictor_coefficients() -> Option<SVector<Self::RealField, 5>> {
+        let twenty_four = Self::RealField::from_u8(24)?;
+
+        Some(SVector::from_column_slice(&[
+            Self::RealField::from_u8(55)? / twenty_four.clone(),
+            -Self::RealField::from_u8(59)? / twenty_four.clone(),
+            Self::RealField::from_u8(37)? / twenty_four.clone(),
+            -Self::RealField::from_u8(9)? / twenty_four,
+            Self::RealField::zero(),
+        ]))
+    }
+
+    fn corrector_coefficients() -> Option<SVector<Self::RealField, 5>> {
+        let seven_hundred_twenty = Self::RealField::from_u16(720)?;
+
+        Some(SVector::from_column_slice(&[
+            Self::RealField::from_u8(251)? / seven_hundred_twenty.clone(),
+            Self::RealField::from_u16(646)? / seven_hundred_twenty.clone(),
+            -Self::RealField::from_u16(264)? / seven_hundred_twenty.clone(),
+            Self::RealField::from_u8(106)? / seven_hundred_twenty.clone(),
+            -Self::RealField::from_u8(19)? / seven_hundred_twenty,
+        ]))
+    }
+
+    fn error_coefficient() -> Option<Self::RealField> {
+        Some(Self::RealField::from_u8(19)? / Self::RealField::from_u16(270)?)
     }
 }
 
 /// 5th order Adams predictor-corrector method for solving an IVP.
 ///
 /// Defines the predictor and corrector coefficients, as well as
-/// the error coefficient. Uses AdamsInfo for the actual solving.
+/// the error coefficient. Uses Adams for the actual solving.
 ///
 /// # Examples
 /// ```
+/// use std::error::Error;
 /// use nalgebra::SVector;
-/// use bacon_sci::ivp::{Adams, AdamsSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, String> {
-///     Ok(SVector::<f64, 1>::from_column_slice(state))
+/// use bacon_sci::ivp::{IVPSolver, IVPError, adams::Adams5};
+///
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
+///     Ok(SVector::from_column_slice(state))
 /// }
 ///
-///
-/// fn example() -> Result<(), String> {
-///     let adams = Adams::new()
-///         .with_dt_max(0.1)?
-///         .with_dt_min(0.00001)?
+/// fn example() -> Result<(), IVPError> {
+///     let adams = Adams5::new()
+///         .with_maximum_dt(0.1)?
+///         .with_minimum_dt(0.00001)?
 ///         .with_tolerance(0.00001)?
-///         .with_start(0.0)?
-///         .with_end(1.0)?
-///         .with_initial_conditions(&[1.0])?
-///         .build();
-///     let path = adams.solve_ivp(derivatives, &mut ())?;
+///         .with_initial_time(0.0)?
+///         .with_ending_time(1.0)?
+///         .with_initial_conditions_slice(&[1.0])?
+///         .with_derivative(derivatives)
+///         .solve(())?;
+///     let path = adams.collect_vec()?;
 ///     for (time, state) in &path {
 ///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
 ///     }
 ///     Ok(())
 /// }
 /// ```
-#[derive(Debug, Clone)]
-pub struct Adams<N, const S: usize>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    info: AdamsInfo<N, S, 5>,
-}
+pub type Adams5<'a, N, const S: usize, T, F> = Adams<'a, N, S, 5, T, F, AdamsCoefficients5<N>>;
 
-impl<N, const S: usize> Adams<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    pub fn new() -> Self {
-        let mut info = AdamsInfo::new();
-        info.corrector_coefficients = SVector::<N, 5>::from_iterator(
-            Self::corrector_coefficients()
-                .iter()
-                .map(|&x| N::from_real(x)),
-        );
-        info.predictor_coefficients = SVector::<N, 5>::from_iterator(
-            Self::predictor_coefficients()
-                .iter()
-                .map(|&x| N::from_real(x)),
-        );
-        info.error_coefficient = Self::error_coefficient();
+pub struct AdamsCoefficients3<N: ComplexField>(PhantomData<N>);
 
-        Adams { info }
-    }
-}
+impl<N: ComplexField + Copy> AdamsCoefficients<3> for AdamsCoefficients3<N> {
+    type RealField = N::RealField;
 
-impl<N, const S: usize> Default for Adams<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<N, const S: usize> AdamsSolver<N, S, 5> for Adams<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn predictor_coefficients() -> SVector<N::RealField, 5> {
-        SVector::<N::RealField, 5>::from_column_slice(&[
-            N::RealField::from_f64(55.0 / 24.0).unwrap(),
-            N::RealField::from_f64(-59.0 / 24.0).unwrap(),
-            N::RealField::from_f64(37.0 / 24.0).unwrap(),
-            N::RealField::from_f64(-9.0 / 24.0).unwrap(),
-            N::RealField::zero(),
-        ])
+    fn predictor_coefficients() -> Option<SVector<Self::RealField, 3>> {
+        Some(SVector::from_column_slice(&[
+            Self::RealField::one() + Self::RealField::from_u8(2)?.recip(),
+            -Self::RealField::from_u8(2)?.recip(),
+            Self::RealField::zero(),
+        ]))
     }
 
-    fn corrector_coefficients() -> SVector<N::RealField, 5> {
-        SVector::<N::RealField, 5>::from_column_slice(&[
-            N::RealField::from_f64(251.0 / 720.0).unwrap(),
-            N::RealField::from_f64(646.0 / 720.0).unwrap(),
-            N::RealField::from_f64(-264.0 / 720.0).unwrap(),
-            N::RealField::from_f64(106.0 / 720.0).unwrap(),
-            N::RealField::from_f64(-19.0 / 720.0).unwrap(),
-        ])
+    fn corrector_coefficients() -> Option<SVector<Self::RealField, 3>> {
+        Some(SVector::from_column_slice(&[
+            Self::RealField::from_u8(5)? / Self::RealField::from_u8(12)?,
+            Self::RealField::from_u8(2)? / Self::RealField::from_u8(3)?,
+            -Self::RealField::from_u8(12)?.recip(),
+        ]))
     }
 
-    fn error_coefficient() -> N::RealField {
-        N::RealField::from_f64(19.0 / 270.0).unwrap()
-    }
-
-    fn solve_ivp<
-        T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
-    >(
-        self,
-        f: F,
-        params: &mut T,
-    ) -> super::Path<N, N::RealField, S> {
-        self.info.solve_ivp(f, params)
-    }
-
-    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_tolerance(tol)?;
-        Ok(self)
-    }
-
-    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_max(max)?;
-        Ok(self)
-    }
-
-    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_min(min)?;
-        Ok(self)
-    }
-
-    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_start(t_initial)?;
-        Ok(self)
-    }
-
-    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_end(t_final)?;
-        Ok(self)
-    }
-
-    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.info = self.info.with_initial_conditions(start)?;
-        Ok(self)
-    }
-
-    fn build(mut self) -> Self {
-        self.info = self.info.build();
-        self
-    }
-}
-
-impl<N, const S: usize> From<Adams<N, S>> for AdamsInfo<N, S, 5>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn from(adams: Adams<N, S>) -> AdamsInfo<N, S, 5> {
-        adams.info
+    fn error_coefficient() -> Option<Self::RealField> {
+        Some(Self::RealField::from_u8(19)? / Self::RealField::from_u16(270)?)
     }
 }
 
 /// 3rd order Adams predictor-corrector method for solving an IVP.
 ///
 /// Defines the predictor and corrector coefficients, as well as
-/// the error coefficient. Uses AdamsInfo for the actual solving.
+/// the error coefficient. Uses Adams for the actual solving.
 ///
 /// # Examples
 /// ```
+/// use std::error::Error;
 /// use nalgebra::SVector;
-/// use bacon_sci::ivp::{Adams2, AdamsSolver};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, String> {
-///     Ok(SVector::<f64, 1>::from_column_slice(state))
+/// use bacon_sci::ivp::{IVPSolver, IVPError, adams::Adams3};
+///
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
+///     Ok(SVector::from_column_slice(state))
 /// }
 ///
 ///
-/// fn example() -> Result<(), String> {
-///     let adams = Adams2::new()
-///         .with_dt_max(0.1)?
-///         .with_dt_min(0.00001)?
+/// fn example() -> Result<(), IVPError> {
+///     let adams = Adams3::new()
+///         .with_maximum_dt(0.1)?
+///         .with_minimum_dt(0.00001)?
 ///         .with_tolerance(0.00001)?
-///         .with_start(0.0)?
-///         .with_end(1.0)?
-///         .with_initial_conditions(&[1.0])?
-///         .build();
-///     let path = adams.solve_ivp(derivatives, &mut ())?;
+///         .with_initial_time(0.0)?
+///         .with_ending_time(1.0)?
+///         .with_initial_conditions_slice(&[1.0])?
+///         .with_derivative(derivatives)
+///         .solve(())?;
+///     let path = adams.collect_vec()?;
 ///     for (time, state) in &path {
 ///         assert!((time.exp() - state.column(0)[0]).abs() < 0.001);
 ///     }
 ///     Ok(())
 /// }
 /// ```
-#[derive(Debug, Clone)]
-pub struct Adams2<N, const S: usize>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    info: AdamsInfo<N, S, 3>,
-}
+pub type Adams3<'a, N, const S: usize, T, F> = Adams<'a, N, S, 3, T, F, AdamsCoefficients3<N>>;
 
-impl<N, const S: usize> Adams2<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    pub fn new() -> Self {
-        let mut info = AdamsInfo::new();
-        info.corrector_coefficients = SVector::<N, 3>::from_iterator(
-            Self::corrector_coefficients()
-                .iter()
-                .map(|&x| N::from_real(x)),
-        );
-        info.predictor_coefficients = SVector::<N, 3>::from_iterator(
-            Self::predictor_coefficients()
-                .iter()
-                .map(|&x| N::from_real(x)),
-        );
-        info.error_coefficient = Self::error_coefficient();
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ivp::IVPSolver;
+    use nalgebra::SVector;
+    use std::error::Error;
 
-        Adams2 { info }
-    }
-}
-
-impl<N, const S: usize> Default for Adams2<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<N, const S: usize> AdamsSolver<N, S, 3> for Adams2<N, S>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn predictor_coefficients() -> SVector<N::RealField, 3> {
-        SVector::<N::RealField, 3>::from_column_slice(&[
-            N::RealField::from_f64(1.5).unwrap(),
-            N::RealField::from_f64(-0.5).unwrap(),
-            N::RealField::zero(),
-        ])
+    fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
+        Ok(SVector::from_column_slice(y))
     }
 
-    fn corrector_coefficients() -> SVector<N::RealField, 3> {
-        SVector::<N::RealField, 3>::from_column_slice(&[
-            N::RealField::from_f64(5.0 / 12.0).unwrap(),
-            N::RealField::from_f64(2.0 / 3.0).unwrap(),
-            N::RealField::from_f64(-1.0 / 12.0).unwrap(),
-        ])
+    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
+        Ok(SVector::from_column_slice(&[-2.0 * t]))
     }
 
-    fn error_coefficient() -> N::RealField {
-        N::RealField::from_f64(19.0 / 270.0).unwrap()
+    fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
+        Ok(SVector::from_iterator(y.iter().map(|_| t.cos())))
     }
 
-    fn solve_ivp<
-        T: Clone,
-        F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, String>,
-    >(
-        self,
-        f: F,
-        params: &mut T,
-    ) -> super::Path<N, N::RealField, S> {
-        self.info.solve_ivp(f, params)
+    // Test predictor-corrector for y=exp(t)
+    #[test]
+    fn adams5_exp() {
+        let t_initial = 0.0;
+        let t_final = 2.0;
+
+        let solver = Adams5::new()
+            .with_minimum_dt(1e-5)
+            .unwrap()
+            .with_maximum_dt(0.1)
+            .unwrap()
+            .with_tolerance(0.0005)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0])
+            .unwrap()
+            .with_derivative(exp_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.exp(),
+                epsilon = 0.01
+            ));
+        }
     }
 
-    fn with_tolerance(mut self, tol: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_tolerance(tol)?;
-        Ok(self)
+    #[test]
+    fn adams5_quadratic() {
+        let t_initial = 0.0;
+        let t_final = 5.0;
+
+        let solver = Adams5::new()
+            .with_minimum_dt(1e-7)
+            .unwrap()
+            .with_maximum_dt(0.001)
+            .unwrap()
+            .with_tolerance(0.01)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0])
+            .unwrap()
+            .with_derivative(quadratic_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                1.0 - step.0.powi(2),
+                epsilon = 0.01
+            ));
+        }
     }
 
-    fn with_dt_max(mut self, max: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_max(max)?;
-        Ok(self)
+    #[test]
+    fn adams5_sine() {
+        let t_initial = 0.0;
+        let t_final = std::f64::consts::TAU;
+
+        let solver = Adams5::new()
+            .with_minimum_dt(1e-5)
+            .unwrap()
+            .with_maximum_dt(0.001)
+            .unwrap()
+            .with_tolerance(0.01)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[0.0])
+            .unwrap()
+            .with_derivative(sine_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.sin(),
+                epsilon = 0.01
+            ));
+        }
     }
 
-    fn with_dt_min(mut self, min: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_dt_min(min)?;
-        Ok(self)
+    #[test]
+    fn adams3_exp() {
+        let t_initial = 0.0;
+        let t_final = 2.0;
+
+        let solver = Adams3::new()
+            .with_minimum_dt(1e-5)
+            .unwrap()
+            .with_maximum_dt(0.1)
+            .unwrap()
+            .with_tolerance(0.001)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0])
+            .unwrap()
+            .with_derivative(exp_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.exp(),
+                epsilon = 0.01
+            ));
+        }
     }
 
-    fn with_start(mut self, t_initial: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_start(t_initial)?;
-        Ok(self)
+    #[test]
+    fn adams3_quadratic() {
+        let t_initial = 0.0;
+        let t_final = 5.0;
+
+        let solver = Adams3::new()
+            .with_minimum_dt(1e-5)
+            .unwrap()
+            .with_maximum_dt(0.001)
+            .unwrap()
+            .with_tolerance(0.1)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0])
+            .unwrap()
+            .with_derivative(quadratic_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                1.0 - step.0.powi(2),
+                epsilon = 0.01
+            ));
+        }
     }
 
-    fn with_end(mut self, t_final: N::RealField) -> Result<Self, String> {
-        self.info = self.info.with_end(t_final)?;
-        Ok(self)
-    }
+    #[test]
+    fn adams3_sine() {
+        let t_initial = 0.0;
+        let t_final = std::f64::consts::TAU;
 
-    fn with_initial_conditions(mut self, start: &[N]) -> Result<Self, String> {
-        self.info = self.info.with_initial_conditions(start)?;
-        Ok(self)
-    }
+        let solver = Adams3::new()
+            .with_minimum_dt(1e-5)
+            .unwrap()
+            .with_maximum_dt(0.001)
+            .unwrap()
+            .with_tolerance(0.01)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[0.0])
+            .unwrap()
+            .with_derivative(sine_deriv)
+            .solve(())
+            .unwrap();
 
-    fn build(mut self) -> Self {
-        self.info = self.info.build();
-        self
-    }
-}
+        let path = solver.collect_vec().unwrap();
 
-impl<N, const S: usize> From<Adams2<N, S>> for AdamsInfo<N, S, 3>
-where
-    N: ComplexField + FromPrimitive + Copy,
-    <N as ComplexField>::RealField: FromPrimitive + Copy,
-{
-    fn from(adams: Adams2<N, S>) -> AdamsInfo<N, S, 3> {
-        adams.info
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.sin(),
+                epsilon = 0.01
+            ));
+        }
     }
 }
