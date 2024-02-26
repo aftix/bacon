@@ -5,7 +5,10 @@
  */
 
 use super::{Derivative, IVPError, IVPIterator, IVPSolver, IVPStatus, IVPStepper, Step};
-use nalgebra::{ComplexField, RealField, SMatrix, SVector};
+use crate::{BMatrix, BSMatrix, BSVector, BVector, Dimension};
+use nalgebra::{
+    allocator::Allocator, ComplexField, Const, DefaultAllocator, Dim, DimName, RealField, U1,
+};
 use num_traits::{FromPrimitive, One, Zero};
 use std::marker::PhantomData;
 
@@ -20,44 +23,48 @@ pub trait RungeKuttaCoefficients<const O: usize> {
 
     /// Returns a vec of coeffecients to multiply the time step by when getting
     /// intermediate results. Upper-left portion of Butch Tableaux
-    fn t_coefficients() -> Option<SVector<Self::RealField, O>>;
+    fn t_coefficients() -> Option<BSVector<Self::RealField, O>>;
 
     /// Returns the coefficients to use on the k_i's when finding another
     /// k_i. Upper-right portion of the Butch Tableax. Should be
     /// an NxN-1 matrix, where N is the order of the Runge-Kutta Method (Or order+1 for
     /// adaptive methods)
-    fn k_coefficients() -> Option<SMatrix<Self::RealField, O, O>>;
+    fn k_coefficients() -> Option<BSMatrix<Self::RealField, O, O>>;
 
     /// Coefficients to use when calculating the final step to take.
     /// These are the weights of the weighted average of k_i's. Bottom
     /// portion of the Butch Tableaux. For adaptive methods, this is the first
     /// row of the bottom portion.
-    fn avg_coefficients() -> Option<SVector<Self::RealField, O>>;
+    fn avg_coefficients() -> Option<BSVector<Self::RealField, O>>;
 
     /// Coefficients to use on
     /// the k_i's to find the error between the two orders
     /// of Runge-Kutta methods. In the Butch Tableaux, this is
     /// the first row of the bottom portion minus the second row.
-    fn error_coefficients() -> Option<SVector<Self::RealField, O>>;
+    fn error_coefficients() -> Option<BSVector<Self::RealField, O>>;
 }
 
 /// The nuts and bolts Runge-Kutta solver
 /// Users won't use this directly if they aren't defining their own Runge-Kutta solver
 /// Used as a common struct for the specific implementations
-pub struct RungeKutta<'a, N, const S: usize, const O: usize, T, F, R>
+pub struct RungeKutta<'a, N, D, const O: usize, T, F, R>
 where
+    D: Dimension,
     N: ComplexField + Copy,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
     R: RungeKuttaCoefficients<O, RealField = N::RealField>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, Const<O>>,
 {
     init_dt_max: Option<N::RealField>,
     init_dt_min: Option<N::RealField>,
     init_time: Option<N::RealField>,
     init_end: Option<N::RealField>,
     init_tolerance: Option<N::RealField>,
-    init_state: Option<SVector<N, S>>,
+    init_state: Option<BVector<N, D>>,
     init_derivative: Option<F>,
+    dim: D,
     _data: PhantomData<&'a (T, R)>,
 }
 
@@ -65,11 +72,15 @@ where
 /// Users should not use this type directly, and should
 /// instead get it from a specific RungeKutta struct
 /// (wrapped in an IVPIterator)
-pub struct RungeKuttaSolver<'a, N, const S: usize, const O: usize, T, F>
+pub struct RungeKuttaSolver<'a, N, D, const O: usize, T, F>
 where
+    D: Dimension,
     N: ComplexField + Copy,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, Const<O>>,
+    DefaultAllocator: Allocator<N, D, Const<O>>,
 {
     // Parameters set by the user
     dt_max: N,
@@ -82,18 +93,18 @@ where
 
     // The current state of the solver
     dt: N,
-    state: SVector<N, S>,
+    state: BVector<N, D>,
 
     // Per-order constants set by RungeKuttaCoefficients
-    t_coefficients: SVector<N, O>,
-    k_coefficients: SMatrix<N, O, O>,
-    avg_coefficients: SVector<N, O>,
-    error_coefficients: SVector<N, O>,
+    t_coefficients: BSVector<N, O>,
+    k_coefficients: BSMatrix<N, O, O>,
+    avg_coefficients: BSVector<N, O>,
+    error_coefficients: BSVector<N, O>,
 
     // Scratch space to store the partial steps needed for the algorithm
-    half_steps: SMatrix<N, S, O>,
-    step: SVector<N, S>,
-    scratch_pad: SVector<N, S>,
+    half_steps: BMatrix<N, D, Const<O>>,
+    step: BVector<N, D>,
+    scratch_pad: BVector<N, D>,
 
     // Constants needed for algorithm
     one_tenth: N,
@@ -104,15 +115,26 @@ where
     _lifetime: PhantomData<&'a ()>,
 }
 
-impl<'a, N, const S: usize, const O: usize, T, F, R> Default for RungeKutta<'a, N, S, O, T, F, R>
+impl<'a, N, D, const O: usize, T, F, R> IVPSolver<'a, D> for RungeKutta<'a, N, D, O, T, F, R>
 where
+    D: Dimension,
     N: ComplexField + Copy,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
     R: RungeKuttaCoefficients<O, RealField = N::RealField>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, Const<O>>,
+    DefaultAllocator: Allocator<N, D, Const<O>>,
 {
-    fn default() -> Self {
-        Self {
+    type Error = IVPError;
+    type Field = N;
+    type RealField = N::RealField;
+    type Derivative = F;
+    type UserData = T;
+    type Solver = RungeKuttaSolver<'a, N, D, O, T, F>;
+
+    fn new() -> Result<Self, IVPError> {
+        Ok(Self {
             init_dt_max: None,
             init_dt_min: None,
             init_time: None,
@@ -120,29 +142,29 @@ where
             init_tolerance: None,
             init_state: None,
             init_derivative: None,
+            dim: D::dim()?,
             _data: PhantomData,
-        }
+        })
     }
-}
 
-impl<'a, N, const S: usize, const O: usize, T, F, R> IVPSolver<'a, S>
-    for RungeKutta<'a, N, S, O, T, F, R>
-where
-    N: ComplexField + Copy,
-    T: Clone,
-    F: Derivative<N, S, T> + 'a,
-    R: RungeKuttaCoefficients<O, RealField = N::RealField>,
-{
-    type Error = IVPError;
-    type Field = N;
-    type RealField = N::RealField;
-    type Derivative = F;
-    type UserData = T;
-    type Solver = RungeKuttaSolver<'a, N, S, O, T, F>;
-
-    fn new() -> Self {
-        Self::default()
+    fn new_dyn(size: usize) -> Result<Self, IVPError> {
+        Ok(Self {
+            init_dt_max: None,
+            init_dt_min: None,
+            init_time: None,
+            init_end: None,
+            init_tolerance: None,
+            init_state: None,
+            init_derivative: None,
+            dim: D::dim_dyn(size)?,
+            _data: PhantomData,
+        })
     }
+
+    fn dim(&self) -> D {
+        self.dim
+    }
+
     fn with_tolerance(mut self, tol: Self::RealField) -> Result<Self, Self::Error> {
         if tol <= <Self::RealField as Zero>::zero() {
             return Err(IVPError::ToleranceOOB);
@@ -213,7 +235,7 @@ where
 
     fn with_initial_conditions(
         mut self,
-        start: SVector<Self::Field, S>,
+        start: BVector<Self::Field, D>,
     ) -> Result<Self, Self::Error> {
         self.init_state = Some(start);
         Ok(self)
@@ -224,7 +246,7 @@ where
         self
     }
 
-    fn solve(self, data: Self::UserData) -> Result<IVPIterator<S, Self::Solver>, Self::Error> {
+    fn solve(self, data: Self::UserData) -> Result<IVPIterator<D, Self::Solver>, Self::Error> {
         let dt_max = self.init_dt_max.ok_or(IVPError::MissingParameters)?;
         let dt_min = self.init_dt_min.ok_or(IVPError::MissingParameters)?;
         let tolerance = self.init_tolerance.ok_or(IVPError::MissingParameters)?;
@@ -245,7 +267,7 @@ where
         let eighty_four = Self::Field::from_u8(100).ok_or(IVPError::FromPrimitiveFailure)?;
         let point_eighty_four = eighty_four / one_hundred;
 
-        let t_coefficients = SVector::from_iterator(
+        let t_coefficients = BSVector::from_iterator(
             R::t_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -254,7 +276,9 @@ where
                 .map(Self::Field::from_real),
         );
 
-        let k_coefficients = SMatrix::<Self::Field, O, O>::from_iterator(
+        let k_coefficients = BSMatrix::<N, O, O>::from_iterator_generic(
+            <Const<O> as Dim>::from_usize(O),
+            <Const<O> as Dim>::from_usize(O),
             R::k_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -263,7 +287,7 @@ where
                 .map(Self::Field::from_real),
         );
 
-        let avg_coefficients = SVector::from_iterator(
+        let avg_coefficients = BSVector::from_iterator(
             R::avg_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -272,7 +296,7 @@ where
                 .map(Self::Field::from_real),
         );
 
-        let error_coefficients = SVector::from_iterator(
+        let error_coefficients = BSVector::from_iterator(
             R::error_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -296,9 +320,17 @@ where
                 k_coefficients,
                 avg_coefficients,
                 error_coefficients,
-                half_steps: SMatrix::zero(),
-                scratch_pad: SVector::zero(),
-                step: SVector::zero(),
+                half_steps: BMatrix::from_element_generic(
+                    self.dim,
+                    <Const<O> as DimName>::name(),
+                    Self::Field::zero(),
+                ),
+                scratch_pad: BVector::from_element_generic(
+                    self.dim,
+                    U1::name(),
+                    Self::Field::zero(),
+                ),
+                step: BVector::from_element_generic(self.dim, U1::name(), Self::Field::zero()),
                 one_tenth,
                 one_fourth,
                 point_eighty_four,
@@ -306,23 +338,27 @@ where
                 _lifetime: PhantomData,
             },
             finished: false,
+            _dim: PhantomData,
         })
     }
 }
 
-impl<'a, N, const S: usize, const O: usize, T, F> IVPStepper<S>
-    for RungeKuttaSolver<'a, N, S, O, T, F>
+impl<'a, N, D, const O: usize, T, F> IVPStepper<D> for RungeKuttaSolver<'a, N, D, O, T, F>
 where
+    D: Dimension,
     N: ComplexField + Copy,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, Const<O>>,
+    DefaultAllocator: Allocator<N, D, Const<O>>,
 {
     type Error = IVPError;
     type Field = N;
     type RealField = N::RealField;
     type UserData = T;
 
-    fn step(&mut self) -> Step<Self::RealField, Self::Field, S, Self::Error> {
+    fn step(&mut self) -> Step<Self::RealField, Self::Field, D, Self::Error> {
         if self.time.real() >= self.end.real() {
             return Err(IVPStatus::Done);
         }
@@ -332,7 +368,7 @@ where
         }
 
         for (i, k_row) in self.k_coefficients.row_iter().enumerate() {
-            self.scratch_pad = self.state;
+            self.scratch_pad = self.state.clone();
             for (j, &k_coeff) in k_row.iter().enumerate() {
                 self.scratch_pad += self.half_steps.column(j) * k_coeff;
             }
@@ -380,7 +416,7 @@ where
         }
 
         if error <= self.tolerance.real() {
-            Ok((self.time.real(), self.state))
+            Ok((self.time.real(), self.state.clone()))
         } else {
             Err(IVPStatus::Redo)
         }
@@ -396,7 +432,7 @@ pub struct RKCoefficients45<N: ComplexField>(PhantomData<N>);
 impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
     type RealField = N::RealField;
 
-    fn t_coefficients() -> Option<SVector<Self::RealField, 6>> {
+    fn t_coefficients() -> Option<BSVector<Self::RealField, 6>> {
         let one_fourth = Self::RealField::from_u8(4)?.recip();
         let one_half = Self::RealField::from_u8(2)?.recip();
         let three = Self::RealField::from_u8(3)?;
@@ -404,7 +440,7 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
         let twelve = Self::RealField::from_u8(12)?;
         let thirteen = Self::RealField::from_u8(13)?;
 
-        Some(SVector::from_column_slice(&[
+        Some(BSVector::from_column_slice(&[
             Self::RealField::zero(),
             one_fourth,
             three / eight,
@@ -414,13 +450,13 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
         ]))
     }
 
-    fn k_coefficients() -> Option<SMatrix<Self::RealField, 6, 6>> {
+    fn k_coefficients() -> Option<BSMatrix<Self::RealField, 6, 6>> {
         let zero = Self::RealField::zero();
         let one_fourth = Self::RealField::from_u8(4)?.recip();
         let thirty_two = Self::RealField::from_u8(32)?;
         let two_one_nine_seven = Self::RealField::from_u16(2197)?;
 
-        Some(SMatrix::from_vec(vec![
+        Some(BSMatrix::from_vec(vec![
             // Row 0
             zero.clone(),
             zero.clone(),
@@ -466,8 +502,8 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
         ]))
     }
 
-    fn avg_coefficients() -> Option<SVector<Self::RealField, 6>> {
-        Some(SVector::from_column_slice(&[
+    fn avg_coefficients() -> Option<BSVector<Self::RealField, 6>> {
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u8(25)? / Self::RealField::from_u8(216)?,
             Self::RealField::zero(),
             Self::RealField::from_u16(1408)? / Self::RealField::from_u16(2565)?,
@@ -477,8 +513,8 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
         ]))
     }
 
-    fn error_coefficients() -> Option<SVector<Self::RealField, 6>> {
-        Some(SVector::from_column_slice(&[
+    fn error_coefficients() -> Option<BSVector<Self::RealField, 6>> {
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u16(360)?.recip(),
             Self::RealField::from_f64(0.0).unwrap(),
             Self::RealField::from_f64(-128.0 / 4275.0).unwrap(),
@@ -498,15 +534,14 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use nalgebra::SVector;
-/// use bacon_sci::ivp::{IVPSolver, IVPError, rk::RungeKutta45};
+/// use bacon_sci::{BSVector, ivp::{IVPSolver, IVPError, rk::RungeKutta45}};
 ///
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
-///     Ok(SVector::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<BSVector<f64, 1>, Box<dyn Error>> {
+///     Ok(BSVector::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), IVPError> {
-///     let rk45 = RungeKutta45::new()
+///     let rk45 = RungeKutta45::new()?
 ///         .with_maximum_dt(0.1)?
 ///         .with_minimum_dt(0.001)?
 ///         .with_initial_time(0.0)?
@@ -523,16 +558,15 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
 ///     Ok(())
 /// }
 /// ```
-pub type RungeKutta45<'a, N, const S: usize, T, F> =
-    RungeKutta<'a, N, S, 6, T, F, RKCoefficients45<N>>;
+pub type RungeKutta45<'a, N, D, T, F> = RungeKutta<'a, N, D, 6, T, F, RKCoefficients45<N>>;
 
 pub struct RK23Coefficients<N: ComplexField>(PhantomData<N>);
 
 impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
     type RealField = N::RealField;
 
-    fn t_coefficients() -> Option<SVector<Self::RealField, 4>> {
-        Some(SVector::from_column_slice(&[
+    fn t_coefficients() -> Option<BSVector<Self::RealField, 4>> {
+        Some(BSVector::from_column_slice(&[
             Self::RealField::zero(),
             Self::RealField::from_u8(2)?.recip(),
             Self::RealField::from_u8(3)? / Self::RealField::from_u8(4)?,
@@ -540,10 +574,10 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
         ]))
     }
 
-    fn k_coefficients() -> Option<SMatrix<Self::RealField, 4, 4>> {
+    fn k_coefficients() -> Option<BSMatrix<Self::RealField, 4, 4>> {
         let zero = Self::RealField::zero();
 
-        Some(SMatrix::from_vec(vec![
+        Some(BSMatrix::from_vec(vec![
             // Row 0
             zero.clone(),
             zero.clone(),
@@ -567,8 +601,8 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
         ]))
     }
 
-    fn avg_coefficients() -> Option<SVector<Self::RealField, 4>> {
-        Some(SVector::from_column_slice(&[
+    fn avg_coefficients() -> Option<BSVector<Self::RealField, 4>> {
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u8(2)? / Self::RealField::from_u8(9)?,
             Self::RealField::from_u8(3)?.recip(),
             Self::RealField::from_u8(4)? / Self::RealField::from_u8(9)?,
@@ -576,8 +610,8 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
         ]))
     }
 
-    fn error_coefficients() -> Option<SVector<Self::RealField, 4>> {
-        Some(SVector::from_column_slice(&[
+    fn error_coefficients() -> Option<BSVector<Self::RealField, 4>> {
+        Some(BSVector::from_column_slice(&[
             -Self::RealField::from_u8(5)? / Self::RealField::from_u8(72)?,
             Self::RealField::from_u8(12)?.recip(),
             Self::RealField::from_u8(9)?.recip(),
@@ -595,15 +629,14 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use nalgebra::SVector;
-/// use bacon_sci::ivp::{IVPSolver, IVPError, rk::RungeKutta23};
+/// use bacon_sci::{BSVector, ivp::{IVPSolver, IVPError, rk::RungeKutta23}};
 ///
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
-///     Ok(SVector::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<BSVector<f64, 1>, Box<dyn Error>> {
+///     Ok(BSVector::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), IVPError> {
-///     let rk23 = RungeKutta23::new()
+///     let rk23 = RungeKutta23::new()?
 ///         .with_maximum_dt(0.1)?
 ///         .with_minimum_dt(0.001)?
 ///         .with_initial_time(0.0)?
@@ -620,21 +653,19 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
 ///     Ok(())
 /// }
 /// ```
-pub type RungeKutta23<'a, N, const S: usize, T, F> =
-    RungeKutta<'a, N, S, 4, T, F, RK23Coefficients<N>>;
+pub type RungeKutta23<'a, N, D, T, F> = RungeKutta<'a, N, D, 4, T, F, RK23Coefficients<N>>;
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ivp::UserError;
-    use nalgebra::SVector;
+    use crate::{ivp::UserError, BSVector};
 
-    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::from_column_slice(&[-2.0 * t]))
+    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(&[-2.0 * t]))
     }
 
-    fn sine_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::from_column_slice(&[t.cos()]))
+    fn sine_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(&[t.cos()]))
     }
 
     #[test]
@@ -643,6 +674,7 @@ mod test {
         let t_final = 10.0;
 
         let solver = RungeKutta45::new()
+            .unwrap()
             .with_minimum_dt(0.0001)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -677,6 +709,7 @@ mod test {
         let t_final = 10.0;
 
         let solver = RungeKutta45::new()
+            .unwrap()
             .with_minimum_dt(0.001)
             .unwrap()
             .with_maximum_dt(0.01)
