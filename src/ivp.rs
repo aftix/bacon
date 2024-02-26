@@ -4,7 +4,8 @@
  * See repository LICENSE for information.
  */
 
-use nalgebra::{ComplexField, RealField, SVector};
+use crate::{BVector, Dimension, DimensionError};
+use nalgebra::{allocator::Allocator, ComplexField, DefaultAllocator, Dim, RealField, U1};
 use num_traits::{FromPrimitive, Zero};
 use std::{error::Error, marker::PhantomData};
 use thiserror::Error;
@@ -30,16 +31,19 @@ pub enum IVPStatus<T: Error> {
 pub type UserError = Box<dyn Error>;
 
 /// A function that can be used as a derivative for the solver
-pub trait Derivative<N: ComplexField + Copy, const S: usize, T: Clone>:
-    FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, UserError>
+pub trait Derivative<N: ComplexField + Copy, D: Dim, T: Clone>:
+    FnMut(N::RealField, &[N], &mut T) -> Result<BVector<N, D>, UserError>
+where
+    DefaultAllocator: Allocator<N, D>,
 {
 }
 
-impl<N, const S: usize, T, F> Derivative<N, S, T> for F
+impl<N, D: Dim, T, F> Derivative<N, D, T> for F
 where
     N: ComplexField + Copy,
     T: Clone,
-    F: FnMut(N::RealField, &[N], &mut T) -> Result<SVector<N, S>, UserError>,
+    F: FnMut(N::RealField, &[N], &mut T) -> Result<BVector<N, D>, UserError>,
+    DefaultAllocator: Allocator<N, D>,
 {
 }
 
@@ -65,6 +69,10 @@ pub enum IVPError {
     MaximumIterationsExceeded,
     #[error("a matrix was unable to be inverted")]
     SingularMatrix,
+    #[error("attempted to build a dynamic solver with static dimension")]
+    DynamicOnStatic,
+    #[error("attempted to build a static solver with dynamic dimension")]
+    StaticOnDynamic,
 }
 
 impl From<UserError> for IVPStatus<IVPError> {
@@ -73,16 +81,28 @@ impl From<UserError> for IVPStatus<IVPError> {
     }
 }
 
+impl From<DimensionError> for IVPError {
+    fn from(value: DimensionError) -> Self {
+        match value {
+            DimensionError::DynamicOnStatic => Self::DynamicOnStatic,
+            DimensionError::StaticOnDynamic => Self::StaticOnDynamic,
+        }
+    }
+}
+
 /// A type alias for a Result of a IVPStepper step
 /// Ok is a tuple of the time and solution at that time
 /// Err is an IVPError
-pub type Step<R, C, const S: usize, E> = Result<(R, SVector<C, S>), IVPStatus<E>>;
+pub type Step<R, C, D, E> = Result<(R, BVector<C, D>), IVPStatus<E>>;
 
 /// Implementing this trait is providing the main functionality of
 /// an initial value problem solver. This should be used only when
 /// implementing an IVPSolver, users should use the solver via the IVPSolver
 /// trait's interface.
-pub trait IVPStepper<const S: usize>: Sized {
+pub trait IVPStepper<D: Dimension>: Sized
+where
+    DefaultAllocator: Allocator<Self::Field, D>,
+{
     /// Error type. IVPError must be able to convert to the error type.
     type Error: Error + From<IVPError>;
     /// The field, complex or real, that the solver is operating on.
@@ -98,7 +118,7 @@ pub trait IVPStepper<const S: usize>: Sized {
     /// Step forward in the solver.
     /// The solver may request a step be redone, signal that the
     /// solution is finished, or give the value of the next solution value.
-    fn step(&mut self) -> Step<Self::RealField, Self::Field, S, Self::Error>;
+    fn step(&mut self) -> Step<Self::RealField, Self::Field, D, Self::Error>;
 
     /// Get the current time of the solver.
     fn time(&self) -> Self::RealField;
@@ -111,7 +131,10 @@ pub trait IVPStepper<const S: usize>: Sized {
 /// IVPSolver implementations should implement a step function that
 /// returns an IVPStatus, then a blanket impl will allow it to be used as an
 /// IntoIterator for the user to iterate over the results.
-pub trait IVPSolver<'a, const S: usize>: Sized {
+pub trait IVPSolver<'a, D: Dimension>: Sized
+where
+    DefaultAllocator: Allocator<Self::Field, D>,
+{
     /// Error type. IVPError must be able to convert to the error type.
     type Error: Error + From<IVPError>;
     /// The field, complex or real, that the solver is operating on.
@@ -121,10 +144,10 @@ pub trait IVPSolver<'a, const S: usize>: Sized {
     /// Arbitrary data provided by the user for the derivative function
     type UserData: Clone;
     /// The type signature of the derivative function to use
-    type Derivative: Derivative<Self::Field, S, Self::UserData> + 'a;
+    type Derivative: Derivative<Self::Field, D, Self::UserData> + 'a;
     /// The type that actually does the solving.
     type Solver: IVPStepper<
-        S,
+        D,
         Error = Self::Error,
         Field = Self::Field,
         RealField = Self::RealField,
@@ -132,8 +155,15 @@ pub trait IVPSolver<'a, const S: usize>: Sized {
     >;
 
     /// Create the solver.
-    /// The parameters need to be set before calling the solve function
-    fn new() -> Self;
+    /// Will fail for dynamically sized solvers
+    fn new() -> Result<Self, Self::Error>;
+
+    /// Create the solver with a run-time dimension.
+    /// Will fail for statically sized solvers
+    fn new_dyn(size: usize) -> Result<Self, Self::Error>;
+
+    /// Gets the dimension of the solver
+    fn dim(&self) -> D;
 
     /// Set the error tolerance for any condition needing needing a float epsilon
     fn with_tolerance(self, tol: Self::RealField) -> Result<Self, Self::Error>;
@@ -145,37 +175,47 @@ pub trait IVPSolver<'a, const S: usize>: Sized {
 
     /// The initial conditions of the problem, should reset any previous values.
     fn with_initial_conditions_slice(self, start: &[Self::Field]) -> Result<Self, Self::Error> {
-        let svector = SVector::from_column_slice(start);
+        let svector = BVector::from_column_slice_generic(self.dim(), U1::from_usize(1), start);
         self.with_initial_conditions(svector)
     }
 
-    /// The initial conditions of the problem, in a SVector. Should reset any previous values.
-    fn with_initial_conditions(self, start: SVector<Self::Field, S>) -> Result<Self, Self::Error>;
+    /// The initial conditions of the problem, in a BVector. Should reset any previous values.
+    fn with_initial_conditions(self, start: BVector<Self::Field, D>) -> Result<Self, Self::Error>;
 
     /// Sets the derivative function to use during the solve
     fn with_derivative(self, derivative: Self::Derivative) -> Self;
 
     /// Turns the solver into an iterator over the solution, using IVPStep::step
-    fn solve(self, data: Self::UserData) -> Result<IVPIterator<S, Self::Solver>, Self::Error>;
+    fn solve(self, data: Self::UserData) -> Result<IVPIterator<D, Self::Solver>, Self::Error>;
 }
 
-pub struct IVPIterator<const S: usize, T: IVPStepper<S>> {
+pub struct IVPIterator<D: Dimension, T: IVPStepper<D>>
+where
+    DefaultAllocator: Allocator<T::Field, D>,
+{
     solver: T,
     finished: bool,
+    _dim: PhantomData<D>,
 }
 
 /// A type alias for collecting all Steps into a Result
 /// of a Vec of the solution ((time, system state))
-pub type Path<R, C, const S: usize, E> = Result<Vec<(R, SVector<C, S>)>, E>;
+pub type Path<R, C, D, E> = Result<Vec<(R, BVector<C, D>)>, E>;
 
-impl<const S: usize, T: IVPStepper<S>> IVPIterator<S, T> {
-    pub fn collect_vec(self) -> Path<T::RealField, T::Field, S, T::Error> {
+impl<D: Dimension, T: IVPStepper<D>> IVPIterator<D, T>
+where
+    DefaultAllocator: Allocator<T::Field, D>,
+{
+    pub fn collect_vec(self) -> Path<T::RealField, T::Field, D, T::Error> {
         self.collect::<Result<Vec<_>, _>>()
     }
 }
 
-impl<const S: usize, T: IVPStepper<S>> Iterator for IVPIterator<S, T> {
-    type Item = Result<(T::RealField, SVector<T::Field, S>), T::Error>;
+impl<D: Dimension, T: IVPStepper<D>> Iterator for IVPIterator<D, T>
+where
+    DefaultAllocator: Allocator<T::Field, D>,
+{
+    type Item = Result<(T::RealField, BVector<T::Field, D>), T::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         use IVPStatus as IE;
@@ -205,14 +245,13 @@ impl<const S: usize, T: IVPStepper<S>> Iterator for IVPIterator<S, T> {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use nalgebra::SVector;
-/// use bacon_sci::ivp::{Euler, IVPSolver, IVPError};
-/// fn derivative(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
-///     Ok(SVector::<f64, 1>::from_column_slice(state))
+/// use bacon_sci::{BSVector, ivp::{Euler, IVPSolver, IVPError}};
+/// fn derivative(_t: f64, state: &[f64], _p: &mut ()) -> Result<BSVector<f64, 1>, Box<dyn Error>> {
+///     Ok(BSVector::<f64, 1>::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), IVPError> {
-///     let solver = Euler::new()
+///     let solver = Euler::new()?
 ///         .with_maximum_dt(0.001)?
 ///         .with_initial_conditions_slice(&[1.0])?
 ///         .with_initial_time(0.0)?
@@ -227,54 +266,50 @@ impl<const S: usize, T: IVPStepper<S>> Iterator for IVPIterator<S, T> {
 ///     Ok(())
 /// }
 /// ```
-pub struct Euler<'a, N: ComplexField + Copy, const S: usize, T: Clone, F>
+pub struct Euler<'a, N, D, T, F>
 where
-    F: Derivative<N, S, T> + 'a,
+    N: ComplexField + Copy,
+    D: Dimension,
+    T: Clone,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
 {
     init_dt: Option<N::RealField>,
     init_time: Option<N::RealField>,
     init_end: Option<N::RealField>,
-    init_state: Option<SVector<N, S>>,
+    init_state: Option<BVector<N, D>>,
     init_derivative: Option<F>,
+    dim: D,
     _data: PhantomData<&'a T>,
 }
 
 /// The struct that actually solves an IVP with Euler's method
 /// Is the associated IVPStepper for Euler (the IVPSolver)
 /// You should use Euler and not this type directly
-pub struct EulerSolver<'a, N: ComplexField + Copy, const S: usize, T: Clone, F>
+pub struct EulerSolver<'a, N, D, T, F>
 where
-    F: Derivative<N, S, T> + 'a,
+    N: ComplexField + Copy,
+    D: Dimension,
+    T: Clone,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
 {
     dt: N,
     time: N,
     end: N,
-    state: SVector<N, S>,
+    state: BVector<N, D>,
     derivative: F,
     data: T,
     _lifetime: PhantomData<&'a ()>,
 }
 
-impl<'a, N: ComplexField + Copy, const S: usize, T: Clone, F> Default for Euler<'a, N, S, T, F>
+impl<'a, N, D, T, F> IVPStepper<D> for EulerSolver<'a, N, D, T, F>
 where
-    F: Derivative<N, S, T> + 'a,
-{
-    fn default() -> Self {
-        Self {
-            init_dt: None,
-            init_time: None,
-            init_end: None,
-            init_state: None,
-            init_derivative: None,
-            _data: PhantomData,
-        }
-    }
-}
-
-impl<'a, N: ComplexField + Copy, const S: usize, T: Clone, F> IVPStepper<S>
-    for EulerSolver<'a, N, S, T, F>
-where
-    F: Derivative<N, S, T> + 'a,
+    N: ComplexField + Copy,
+    D: Dimension,
+    T: Clone,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
 {
     type Error = IVPError;
     type Field = N;
@@ -283,7 +318,7 @@ where
 
     fn step(
         &mut self,
-    ) -> Result<(Self::RealField, SVector<Self::Field, S>), IVPStatus<Self::Error>> {
+    ) -> Result<(Self::RealField, BVector<Self::Field, D>), IVPStatus<Self::Error>> {
         if self.time.real() >= self.end.real() {
             return Err(IVPStatus::Done);
         }
@@ -295,7 +330,7 @@ where
             .map_err(IVPError::UserError)?;
 
         let old_time = self.time.real();
-        let old_state = self.state;
+        let old_state = self.state.clone();
 
         self.state += derivative * self.dt;
         self.time += self.dt;
@@ -308,20 +343,47 @@ where
     }
 }
 
-impl<'a, N: ComplexField + Copy, const S: usize, T: Clone, F> IVPSolver<'a, S>
-    for Euler<'a, N, S, T, F>
+impl<'a, N, D, T, F> IVPSolver<'a, D> for Euler<'a, N, D, T, F>
 where
-    F: Derivative<N, S, T> + 'a,
+    N: ComplexField + Copy,
+    D: Dimension,
+    T: Clone,
+    F: Derivative<N, D, T> + 'a,
+    DefaultAllocator: Allocator<N, D>,
 {
     type Error = IVPError;
     type Field = N;
     type RealField = N::RealField;
     type Derivative = F;
     type UserData = T;
-    type Solver = EulerSolver<'a, N, S, T, F>;
+    type Solver = EulerSolver<'a, N, D, T, F>;
 
-    fn new() -> Self {
-        Self::default()
+    fn new() -> Result<Self, Self::Error> {
+        Ok(Self {
+            init_dt: None,
+            init_time: None,
+            init_end: None,
+            init_state: None,
+            init_derivative: None,
+            dim: D::dim()?,
+            _data: PhantomData,
+        })
+    }
+
+    fn new_dyn(size: usize) -> Result<Self, Self::Error> {
+        Ok(Self {
+            init_dt: None,
+            init_time: None,
+            init_end: None,
+            init_state: None,
+            init_derivative: None,
+            dim: D::dim_dyn(size)?,
+            _data: PhantomData,
+        })
+    }
+
+    fn dim(&self) -> D {
+        self.dim
     }
 
     /// Unused for Euler, call is a no-op
@@ -385,7 +447,7 @@ where
 
     fn with_initial_conditions(
         mut self,
-        start: SVector<Self::Field, S>,
+        start: BVector<Self::Field, D>,
     ) -> Result<Self, Self::Error> {
         self.init_state = Some(start);
         Ok(self)
@@ -396,7 +458,7 @@ where
         self
     }
 
-    fn solve(mut self, data: Self::UserData) -> Result<IVPIterator<S, Self::Solver>, Self::Error> {
+    fn solve(mut self, data: Self::UserData) -> Result<IVPIterator<D, Self::Solver>, Self::Error> {
         let dt = self.init_dt.ok_or(IVPError::MissingParameters)?;
         let time = self.init_time.ok_or(IVPError::MissingParameters)?;
         let end = self.init_end.ok_or(IVPError::MissingParameters)?;
@@ -417,27 +479,31 @@ where
                 _lifetime: PhantomData,
             },
             finished: false,
+            _dim: PhantomData,
         })
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Derivative, Euler, IVPError, IVPSolver, UserError};
-    use nalgebra::SVector;
+    use super::*;
+    use crate::BSVector;
+    use nalgebra::{DimName, Dyn};
 
-    type Path<const S: usize> = Vec<(f64, SVector<f64, S>)>;
+    type Path<D> = Vec<(f64, BVector<f64, D>)>;
 
-    fn solve_ivp<const S: usize, F>(
+    fn solve_ivp<'a, D, F>(
         (initial, end): (f64, f64),
         dt: f64,
         initial_conds: &[f64],
         derivative: F,
-    ) -> Result<Path<S>, IVPError>
+    ) -> Result<Path<D>, IVPError>
     where
-        F: Derivative<f64, S, ()> + 'static,
+        D: Dimension,
+        F: Derivative<f64, D, ()> + 'a,
+        DefaultAllocator: Allocator<f64, D>,
     {
-        let ivp = Euler::new()
+        let ivp = Euler::new()?
             .with_initial_time(initial)?
             .with_ending_time(end)?
             .with_maximum_dt(dt)?
@@ -446,20 +512,76 @@ mod test {
         ivp.solve(())?.collect()
     }
 
-    fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::<f64, 1>::from_column_slice(y))
+    fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(y))
     }
 
-    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::<f64, 1>::from_column_slice(&[-2.0 * t]))
+    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(&[-2.0 * t]))
     }
 
-    fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::<f64, 1>::from_iterator(y.iter().map(|_| t.cos())))
+    fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_iterator(y.iter().map(|_| t.cos())))
     }
 
-    fn cos_deriv(_t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 2>, UserError> {
-        Ok(SVector::<f64, 2>::from_column_slice(&[y[1], -y[0]]))
+    fn cos_deriv(_t: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 2>, UserError> {
+        Ok(BSVector::from_column_slice(&[y[1], -y[0]]))
+    }
+
+    fn dynamic_cos_deriv(_t: f64, y: &[f64], _: &mut ()) -> Result<BVector<f64, Dyn>, UserError> {
+        Ok(BVector::from_column_slice_generic(
+            Dyn::from_usize(y.len()),
+            U1::name(),
+            &[y[1], -y[0]],
+        ))
+    }
+
+    #[test]
+    #[should_panic]
+    fn euler_dynamic_cos_panics() {
+        let t_initial = 0.0;
+        let t_final = 1.0;
+
+        let path = solve_ivp((t_initial, t_final), 0.01, &[1.0, 0.0], dynamic_cos_deriv).unwrap();
+
+        for step in path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.cos(),
+                epsilon = 0.01
+            ));
+        }
+    }
+
+    #[test]
+    fn euler_dynamic_cos() {
+        let t_initial = 0.0;
+        let t_final = 1.0;
+
+        let ivp = Euler::new_dyn(2)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_maximum_dt(0.01)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0, 0.0])
+            .unwrap()
+            .with_derivative(dynamic_cos_deriv)
+            .solve(())
+            .unwrap();
+        let path = ivp.collect_vec().unwrap();
+
+        for step in path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.cos(),
+                epsilon = 0.01
+            ));
+        }
     }
 
     #[test]

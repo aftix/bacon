@@ -20,7 +20,9 @@ jobs:
   release:
     name: Release bacon-sci to crates.io
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v4
         with:

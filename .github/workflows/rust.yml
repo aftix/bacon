@@ -1,9 +1,9 @@
 name: Rust
 
 on:
+  create:
   push:
     branches: [master]
-    tags: ['*']
   pull_request:
 
 env:

@@ -5,7 +5,10 @@
  */
 
 use super::{Derivative, IVPError, IVPIterator, IVPSolver, IVPStatus, IVPStepper, Step, UserError};
-use nalgebra::{ComplexField, Const, DimMin, RealField, SMatrix, SVector, ToTypenum};
+use crate::{BMatrix, BSVector, BVector, Dimension};
+use nalgebra::{
+    allocator::Allocator, ComplexField, DefaultAllocator, Dim, DimMin, DimName, RealField, U1,
+};
 use num_traits::{FromPrimitive, One, Zero};
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -24,7 +27,7 @@ pub trait BDFCoefficients<const O: usize> {
     /// coefficients for the previous terms
     /// should have the sign as if they're on the
     /// same side of the = as the next state.
-    fn higher_coefficients() -> Option<SVector<Self::RealField, O>>;
+    fn higher_coefficients() -> Option<BSVector<Self::RealField, O>>;
 
     /// The polynomial interpolation coefficients for the lower-order
     /// method. Must be
@@ -34,27 +37,31 @@ pub trait BDFCoefficients<const O: usize> {
     /// coefficients for the previous terms
     /// should have the sign as if they're on the
     /// same side of the = as the next state.
-    fn lower_coefficients() -> Option<SVector<Self::RealField, O>>;
+    fn lower_coefficients() -> Option<BSVector<Self::RealField, O>>;
 }
 
 /// The nuts and bolts BDF solver
 /// Users won't use this directly if they aren't defining their own BDF
 /// Used as a common struct for the specific implementations
-pub struct BDF<'a, N, const S: usize, const O: usize, T, F, B>
+pub struct BDF<'a, N, D, const O: usize, T, F, B>
 where
     N: ComplexField + Copy,
+    D: Dimension,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
     B: BDFCoefficients<O, RealField = N::RealField>,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
+    D: DimMin<D, Output = D>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, D, D>,
 {
     init_dt_max: Option<N::RealField>,
     init_dt_min: Option<N::RealField>,
     init_time: Option<N::RealField>,
     init_end: Option<N::RealField>,
     init_tolerance: Option<N::RealField>,
-    init_state: Option<SVector<N, S>>,
+    init_state: Option<BVector<N, D>>,
     init_derivative: Option<F>,
+    dim: D,
     _data: PhantomData<&'a (T, B)>,
 }
 
@@ -62,12 +69,15 @@ where
 /// Users should not use this type directly, and should
 /// instead get it from a specific BDF method struct
 /// (wrapped in an IVPIterator)
-pub struct BDFSolver<'a, N, const S: usize, const O: usize, T, F>
+pub struct BDFSolver<'a, N, D, const O: usize, T, F>
 where
+    D: Dimension,
     N: ComplexField + Copy,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
+    F: Derivative<N, D, T> + 'a,
+    D: DimMin<D, Output = D>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, D, D>,
 {
     // Parameters set by the user
     dt_max: N,
@@ -76,23 +86,24 @@ where
     end: N,
     tolerance: N,
     derivative: F,
+    dim: D,
     data: T,
 
     // Current solution at t = self.time
     dt: N,
-    state: SVector<N, S>,
+    state: BVector<N, D>,
 
     // Per-order constants set by an BDFCoefficients
-    higher_coefficients: SVector<N, O>,
-    lower_coefficients: SVector<N, O>,
+    higher_coefficients: BSVector<N, O>,
+    lower_coefficients: BSVector<N, O>,
 
     // Previous steps to interpolate with
-    prev_values: VecDeque<(N::RealField, SVector<N, S>)>,
+    prev_values: VecDeque<(N::RealField, BVector<N, D>)>,
 
     // A scratch vector to use during the algorithm (to avoid allocating & de-allocating every step)
-    scratch_pad: SVector<N, S>,
+    scratch_pad: BVector<N, D>,
     // A place to store solver state while taking speculative steps trying to find a good timestep
-    save_state: SVector<N, S>,
+    save_state: BVector<N, D>,
 
     // Constants for the particular field
     one_tenth: N,
@@ -110,16 +121,28 @@ where
     _lifetime: PhantomData<&'a ()>,
 }
 
-impl<'a, N, const S: usize, const O: usize, T, F, B> Default for BDF<'a, N, S, O, T, F, B>
+impl<'a, N, D, const O: usize, T, F, B> IVPSolver<'a, D> for BDF<'a, N, D, O, T, F, B>
 where
     N: ComplexField + Copy,
+    D: Dimension,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
+    F: Derivative<N, D, T> + 'a,
     B: BDFCoefficients<O, RealField = N::RealField>,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
+    D: DimMin<D, Output = D>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, U1, D>,
+    DefaultAllocator: Allocator<N, D, D>,
+    DefaultAllocator: Allocator<(usize, usize), D>,
 {
-    fn default() -> Self {
-        Self {
+    type Error = IVPError;
+    type Field = N;
+    type RealField = N::RealField;
+    type Derivative = F;
+    type UserData = T;
+    type Solver = BDFSolver<'a, N, D, O, T, F>;
+
+    fn new() -> Result<Self, Self::Error> {
+        Ok(Self {
             init_dt_max: None,
             init_dt_min: None,
             init_time: None,
@@ -127,28 +150,27 @@ where
             init_tolerance: None,
             init_state: None,
             init_derivative: None,
+            dim: D::dim()?,
             _data: PhantomData,
-        }
+        })
     }
-}
 
-impl<'a, N, const S: usize, const O: usize, T, F, B> IVPSolver<'a, S> for BDF<'a, N, S, O, T, F, B>
-where
-    N: ComplexField + Copy,
-    T: Clone,
-    F: Derivative<N, S, T> + 'a,
-    B: BDFCoefficients<O, RealField = N::RealField>,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
-{
-    type Error = IVPError;
-    type Field = N;
-    type RealField = N::RealField;
-    type Derivative = F;
-    type UserData = T;
-    type Solver = BDFSolver<'a, N, S, O, T, F>;
+    fn new_dyn(size: usize) -> Result<Self, Self::Error> {
+        Ok(Self {
+            init_dt_max: None,
+            init_dt_min: None,
+            init_time: None,
+            init_end: None,
+            init_tolerance: None,
+            init_state: None,
+            init_derivative: None,
+            dim: D::dim_dyn(size)?,
+            _data: PhantomData,
+        })
+    }
 
-    fn new() -> Self {
-        Self::default()
+    fn dim(&self) -> D {
+        self.dim
     }
 
     fn with_tolerance(mut self, tol: Self::RealField) -> Result<Self, Self::Error> {
@@ -221,7 +243,7 @@ where
 
     fn with_initial_conditions(
         mut self,
-        start: SVector<Self::Field, S>,
+        start: BVector<Self::Field, D>,
     ) -> Result<Self, Self::Error> {
         self.init_state = Some(start);
         Ok(self)
@@ -232,7 +254,7 @@ where
         self
     }
 
-    fn solve(self, data: Self::UserData) -> Result<IVPIterator<S, Self::Solver>, Self::Error> {
+    fn solve(self, data: Self::UserData) -> Result<IVPIterator<D, Self::Solver>, Self::Error> {
         let dt_max = self.init_dt_max.ok_or(IVPError::MissingParameters)?;
         let dt_min = self.init_dt_min.ok_or(IVPError::MissingParameters)?;
         let tolerance = self.init_tolerance.ok_or(IVPError::MissingParameters)?;
@@ -250,7 +272,7 @@ where
             .ok_or(IVPError::FromPrimitiveFailure)?
             .recip();
 
-        let higher_coefficients = SVector::from_iterator(
+        let higher_coefficients = BSVector::from_iterator(
             B::higher_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -259,7 +281,7 @@ where
                 .map(Self::Field::from_real),
         );
 
-        let lower_coefficients = SVector::from_iterator(
+        let lower_coefficients = BSVector::from_iterator(
             B::lower_coefficients()
                 .ok_or(IVPError::FromPrimitiveFailure)?
                 .as_slice()
@@ -280,12 +302,21 @@ where
                 dt: Self::Field::from_real(dt_max + dt_min) * half,
                 state,
                 derivative,
+                dim: self.dim,
                 data,
                 higher_coefficients,
                 lower_coefficients,
                 prev_values: VecDeque::new(),
-                scratch_pad: SVector::zero(),
-                save_state: SVector::zero(),
+                scratch_pad: BVector::from_element_generic(
+                    self.dim,
+                    U1::name(),
+                    Self::Field::zero(),
+                ),
+                save_state: BVector::from_element_generic(
+                    self.dim,
+                    U1::from_usize(1),
+                    Self::Field::zero(),
+                ),
                 one_tenth,
                 one_sixth,
                 half,
@@ -295,16 +326,22 @@ where
                 _lifetime: PhantomData,
             },
             finished: false,
+            _dim: PhantomData,
         })
     }
 }
 
-impl<'a, N, const S: usize, const O: usize, T, F> BDFSolver<'a, N, S, O, T, F>
+impl<'a, N, D, const O: usize, T, F> BDFSolver<'a, N, D, O, T, F>
 where
     N: ComplexField + Copy,
+    D: Dimension,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
+    F: Derivative<N, D, T> + 'a,
+    D: DimMin<D, Output = D>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, U1, D>,
+    DefaultAllocator: Allocator<N, D, D>,
+    DefaultAllocator: Allocator<(usize, usize), D>,
 {
     fn runge_kutta(&mut self, iterations: usize) -> Result<(), IVPError> {
         for i in 0..iterations {
@@ -313,21 +350,21 @@ where
                 self.state.as_slice(),
                 &mut self.data.clone(),
             )? * self.dt;
-            let intermediate = self.state + k1 * self.half;
+            let intermediate = &self.state + &k1 * self.half;
 
             let k2 = (self.derivative)(
                 (self.time + self.half * self.dt).real(),
                 intermediate.as_slice(),
                 &mut self.data.clone(),
             )? * self.dt;
-            let intermediate = self.state + k2 * self.half;
+            let intermediate = &self.state + &k2 * self.half;
 
             let k3 = (self.derivative)(
                 (self.time + self.half * self.dt).real(),
                 intermediate.as_slice(),
                 &mut self.data.clone(),
             )? * self.dt;
-            let intermediate = self.state + k3;
+            let intermediate = &self.state + &k3;
 
             let k4 = (self.derivative)(
                 (self.time + self.dt).real(),
@@ -336,13 +373,15 @@ where
             )? * self.dt;
 
             if i != 0 {
-                self.prev_values.push_back((self.time.real(), self.state));
+                self.prev_values
+                    .push_back((self.time.real(), self.state.clone()));
             }
 
             self.state += (k1 + k2 * self.two + k3 * self.two + k4) * self.one_sixth;
             self.time += self.dt;
         }
-        self.prev_values.push_back((self.time.real(), self.state));
+        self.prev_values
+            .push_back((self.time.real(), self.state.clone()));
 
         Ok(())
     }
@@ -350,13 +389,13 @@ where
     // Used for secant method
     fn jac_finite_diff<G>(
         &mut self,
-        x: &mut SVector<N, S>,
+        x: &mut BVector<N, D>,
         g: &mut G,
-    ) -> Result<SMatrix<N, S, S>, IVPError>
+    ) -> Result<BMatrix<N, D, D>, IVPError>
     where
-        G: FnMut(&mut Self, N::RealField, &[N], &mut T) -> Result<SVector<N, S>, UserError>,
+        G: FnMut(&mut Self, N::RealField, &[N], &mut T) -> Result<BVector<N, D>, UserError>,
     {
-        let mut mat = SMatrix::<N, S, S>::zero();
+        let mut mat = BMatrix::from_element_generic(self.dim, self.dim, N::zero());
         let denom = (self.two * self.dt).recip();
 
         for (ind, mut col) in mat.column_iter_mut().enumerate() {
@@ -372,13 +411,13 @@ where
     }
 
     // Secant method for performing the BDF
-    fn secant<G>(&mut self, g: &mut G) -> Result<SVector<N, S>, IVPError>
+    fn secant<G>(&mut self, g: &mut G) -> Result<BVector<N, D>, IVPError>
     where
-        G: FnMut(&mut Self, N::RealField, &[N], &mut T) -> Result<SVector<N, S>, UserError>,
+        G: FnMut(&mut Self, N::RealField, &[N], &mut T) -> Result<BVector<N, D>, UserError>,
     {
         let mut n = 2;
 
-        let mut guess = self.state;
+        let mut guess = self.state.clone();
         let mut derivative = g(
             self,
             self.time.real(),
@@ -387,11 +426,11 @@ where
         )?;
 
         let jac = self.jac_finite_diff(&mut guess, g)?;
-        let lu = jac.lu();
+        let lu = jac.clone().lu();
         let mut jac_inv = if let Some(inv) = lu.try_inverse() {
             inv
         } else {
-            let lu = jac.full_piv_lu();
+            let lu = jac.clone().full_piv_lu();
             if let Some(inv) = lu.try_inverse() {
                 inv
             } else {
@@ -404,7 +443,7 @@ where
             }
         };
 
-        let mut shift = -jac_inv * derivative;
+        let mut shift = -&jac_inv * &derivative;
         guess += &shift;
 
         while n < 1000 {
@@ -416,14 +455,14 @@ where
                 &mut self.data.clone(),
             )?;
 
-            let difference = derivative - derivative_last;
-            let adjustment = -jac_inv * difference;
-            let s_transpose = shift.transpose();
-            let p = (-s_transpose * adjustment)[(0, 0)];
-            let u = s_transpose * jac_inv;
+            let difference = &derivative - &derivative_last;
+            let adjustment = -&jac_inv * difference;
+            let s_transpose = shift.clone().transpose();
+            let p = (-&s_transpose * &adjustment)[(0, 0)];
+            let u = s_transpose * &jac_inv;
 
             jac_inv += (shift + adjustment) * u / p;
-            shift = -&jac_inv * derivative;
+            shift = -&jac_inv * &derivative;
             guess += &shift;
 
             if shift.norm() <= self.tolerance.real() {
@@ -436,19 +475,24 @@ where
     }
 }
 
-impl<'a, N, const S: usize, const O: usize, T, F> IVPStepper<S> for BDFSolver<'a, N, S, O, T, F>
+impl<'a, N, D, const O: usize, T, F> IVPStepper<D> for BDFSolver<'a, N, D, O, T, F>
 where
     N: ComplexField + Copy,
+    D: Dimension,
     T: Clone,
-    F: Derivative<N, S, T> + 'a,
-    Const<S>: ToTypenum + DimMin<Const<S>, Output = Const<S>>,
+    F: Derivative<N, D, T> + 'a,
+    D: DimMin<D, Output = D>,
+    DefaultAllocator: Allocator<N, D>,
+    DefaultAllocator: Allocator<N, U1, D>,
+    DefaultAllocator: Allocator<N, D, D>,
+    DefaultAllocator: Allocator<(usize, usize), D>,
 {
     type Error = IVPError;
     type Field = N;
     type RealField = N::RealField;
     type UserData = T;
 
-    fn step(&mut self) -> Step<Self::RealField, Self::Field, S, Self::Error> {
+    fn step(&mut self) -> Step<Self::RealField, Self::Field, D, Self::Error> {
         // If yield_memory is in [1, Order] then we have taken a runge-kutta step
         // and committed to it (i.e. determined that we are within error bounds)
         // If yield_memory is Order+1 then we have taken a runge-kutta step but haven't
@@ -474,9 +518,10 @@ where
         // since the derivatives deque is unused while yielding runge-kutta steps
         if self.yield_memory == O + 2 {
             self.yield_memory = 0;
-            self.prev_values.push_back((self.time.real(), self.state));
+            self.prev_values
+                .push_back((self.time.real(), self.state.clone()));
             self.prev_values.pop_front();
-            return Ok((self.time.real(), self.state));
+            return Ok((self.time.real(), self.state.clone()));
         }
 
         if self.time.real() >= self.end.real() {
@@ -486,11 +531,11 @@ where
         if self.time.real() + self.dt.real() >= self.end.real() {
             self.dt = self.end - self.time;
             self.runge_kutta(1)?;
-            return Ok((self.time.real(), self.prev_values.back().unwrap().1));
+            return Ok((self.time.real(), self.prev_values.back().unwrap().1.clone()));
         }
 
         if self.prev_values.is_empty() {
-            self.save_state = self.state;
+            self.save_state = self.state.clone();
             if self.time.real() + self.dt.real() * self.order.real() >= self.end.real() {
                 self.dt = (self.end - self.time) / self.order;
             }
@@ -504,29 +549,35 @@ where
                                t: Self::RealField,
                                y: &[N],
                                data: &mut T|
-         -> Result<SVector<N, S>, UserError> {
+         -> Result<BVector<N, D>, UserError> {
             bdf.scratch_pad = -(bdf.derivative)(t, y, data)? * bdf.dt * bdf.higher_coefficients[0];
             for (ind, &coeff) in bdf.higher_coefficients.column(0).iter().enumerate().skip(1) {
-                bdf.scratch_pad += bdf.prev_values[O - ind].1 * coeff;
+                bdf.scratch_pad += &bdf.prev_values[O - ind].1 * coeff;
             }
-            Ok(bdf.scratch_pad + SVector::from_column_slice(y))
+            Ok(
+                bdf.scratch_pad.clone()
+                    + BVector::from_column_slice_generic(bdf.dim, U1::name(), y),
+            )
         };
         let mut lower_func = |bdf: &mut Self,
                               t: Self::RealField,
                               y: &[N],
                               data: &mut T|
-         -> Result<SVector<N, S>, UserError> {
+         -> Result<BVector<N, D>, UserError> {
             bdf.scratch_pad = -(bdf.derivative)(t, y, data)? * bdf.dt * bdf.lower_coefficients[0];
             for (ind, &coeff) in bdf.higher_coefficients.column(0).iter().enumerate().skip(1) {
-                bdf.scratch_pad += bdf.prev_values[O - ind].1 * coeff;
+                bdf.scratch_pad += &bdf.prev_values[O - ind].1 * coeff;
             }
-            Ok(bdf.scratch_pad + SVector::from_column_slice(y))
+            Ok(
+                bdf.scratch_pad.clone()
+                    + BVector::from_column_slice_generic(bdf.dim, U1::name(), y),
+            )
         };
 
         let higher_step = self.secant(&mut higher_func)?;
         let lower_step = self.secant(&mut lower_func)?;
 
-        let difference = higher_step - lower_step;
+        let difference = &higher_step - &lower_step;
         let error = difference.norm();
 
         if error <= self.tolerance.real() {
@@ -544,7 +595,8 @@ where
                 return Err(IVPStatus::Redo);
             }
 
-            self.prev_values.push_back((self.time.real(), self.state));
+            self.prev_values
+                .push_back((self.time.real(), self.state.clone()));
             self.prev_values.pop_front();
 
             if error < self.one_tenth.real() * self.tolerance.real() {
@@ -558,7 +610,7 @@ where
                 self.prev_values.clear();
             }
 
-            return Ok((self.time.real(), self.state));
+            return Ok((self.time.real(), self.state.clone()));
         }
 
         // yield_memory can be Order+1 here, meaning we speculatively tried a timestep and the lower timestep
@@ -568,7 +620,7 @@ where
         if self.yield_memory == O + 1 {
             // We took Order - 1 runge kutta steps at this dt
             self.time -= self.dt - self.order;
-            self.state = self.save_state;
+            self.state = self.save_state.clone();
         }
 
         self.dt *= self.half;
@@ -591,10 +643,10 @@ pub struct BDF6Coefficients<N: ComplexField>(PhantomData<N>);
 impl<N: ComplexField> BDFCoefficients<7> for BDF6Coefficients<N> {
     type RealField = N::RealField;
 
-    fn higher_coefficients() -> Option<SVector<Self::RealField, 7>> {
+    fn higher_coefficients() -> Option<BSVector<Self::RealField, 7>> {
         let one_hundred_forty_seven = Self::RealField::from_u8(147)?;
 
-        Some(SVector::from_column_slice(&[
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u8(60)? / one_hundred_forty_seven.clone(),
             -Self::RealField::from_u16(360)? / one_hundred_forty_seven.clone(),
             Self::RealField::from_u16(450)? / one_hundred_forty_seven.clone(),
@@ -605,10 +657,10 @@ impl<N: ComplexField> BDFCoefficients<7> for BDF6Coefficients<N> {
         ]))
     }
 
-    fn lower_coefficients() -> Option<SVector<Self::RealField, 7>> {
+    fn lower_coefficients() -> Option<BSVector<Self::RealField, 7>> {
         let one_hundred_thirty_seven = Self::RealField::from_u8(137)?;
 
-        Some(SVector::from_column_slice(&[
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u8(60)? / one_hundred_thirty_seven.clone(),
             -Self::RealField::from_u16(300)? / one_hundred_thirty_seven.clone(),
             Self::RealField::from_u16(300)? / one_hundred_thirty_seven.clone(),
@@ -629,15 +681,14 @@ impl<N: ComplexField> BDFCoefficients<7> for BDF6Coefficients<N> {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use nalgebra::SVector;
-/// use bacon_sci::ivp::{IVPSolver, IVPError, bdf::BDF6};
+/// use bacon_sci::{BSVector, ivp::{IVPSolver, IVPError, bdf::BDF6}};
 ///
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
-///     Ok(-SVector::from_column_slice(state))
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<BSVector<f64, 1>, Box<dyn Error>> {
+///     Ok(-BSVector::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), IVPError> {
-///     let bdf = BDF6::new()
+///     let bdf = BDF6::new()?
 ///         .with_maximum_dt(0.1)?
 ///         .with_minimum_dt(0.00001)?
 ///         .with_tolerance(0.00001)?
@@ -652,25 +703,25 @@ impl<N: ComplexField> BDFCoefficients<7> for BDF6Coefficients<N> {
 ///     }
 ///     Ok(())
 /// }
-pub type BDF6<'a, N, const S: usize, T, F> = BDF<'a, N, S, 7, T, F, BDF6Coefficients<N>>;
+pub type BDF6<'a, N, D, T, F> = BDF<'a, N, D, 7, T, F, BDF6Coefficients<N>>;
 
 pub struct BDF2Coefficients<N: ComplexField>(PhantomData<N>);
 
 impl<N: ComplexField> BDFCoefficients<3> for BDF2Coefficients<N> {
     type RealField = N::RealField;
 
-    fn higher_coefficients() -> Option<SVector<Self::RealField, 3>> {
+    fn higher_coefficients() -> Option<BSVector<Self::RealField, 3>> {
         let three = Self::RealField::from_u8(3)?;
 
-        Some(SVector::from_column_slice(&[
+        Some(BSVector::from_column_slice(&[
             Self::RealField::from_u8(2)? / three.clone(),
             -Self::RealField::from_u8(4)? / three.clone(),
             three.recip(),
         ]))
     }
 
-    fn lower_coefficients() -> Option<SVector<Self::RealField, 3>> {
-        Some(SVector::from_column_slice(&[
+    fn lower_coefficients() -> Option<BSVector<Self::RealField, 3>> {
+        Some(BSVector::from_column_slice(&[
             Self::RealField::one(),
             -Self::RealField::one(),
             Self::RealField::zero(),
@@ -687,14 +738,13 @@ impl<N: ComplexField> BDFCoefficients<3> for BDF2Coefficients<N> {
 /// # Examples
 /// ```
 /// use std::error::Error;
-/// use nalgebra::SVector;
-/// use bacon_sci::ivp::{IVPSolver, IVPError, bdf::BDF2};
-/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<SVector<f64, 1>, Box<dyn Error>> {
-///     Ok(-SVector::from_column_slice(state))
+/// use bacon_sci::{BSVector, ivp::{IVPSolver, IVPError, bdf::BDF2}};
+/// fn derivatives(_t: f64, state: &[f64], _p: &mut ()) -> Result<BSVector<f64, 1>, Box<dyn Error>> {
+///     Ok(-BSVector::from_column_slice(state))
 /// }
 ///
 /// fn example() -> Result<(), IVPError> {
-///     let bdf = BDF2::new()
+///     let bdf = BDF2::new()?
 ///         .with_maximum_dt(0.1)?
 ///         .with_minimum_dt(0.00001)?
 ///         .with_tolerance(0.00001)?
@@ -709,27 +759,27 @@ impl<N: ComplexField> BDFCoefficients<3> for BDF2Coefficients<N> {
 ///     }
 ///     Ok(())
 /// }
-pub type BDF2<'a, N, const S: usize, T, F> = BDF<'a, N, S, 3, T, F, BDF2Coefficients<N>>;
+pub type BDF2<'a, N, D, T, F> = BDF<'a, N, D, 3, T, F, BDF2Coefficients<N>>;
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use nalgebra::SVector;
+    use crate::BSVector;
 
-    fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::from_column_slice(y))
+    fn exp_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(y))
     }
 
-    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::from_column_slice(&[-2.0 * t]))
+    fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_column_slice(&[-2.0 * t]))
     }
 
-    fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(SVector::from_iterator(y.iter().map(|_| t.cos())))
+    fn sine_deriv(t: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(BSVector::from_iterator(y.iter().map(|_| t.cos())))
     }
 
-    fn unstable_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<SVector<f64, 1>, UserError> {
-        Ok(-SVector::from_column_slice(y))
+    fn unstable_deriv(_: f64, y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
+        Ok(-BSVector::from_column_slice(y))
     }
 
     #[test]
@@ -738,6 +788,7 @@ mod test {
         let t_final = 7.0;
 
         let solver = BDF6::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -772,6 +823,7 @@ mod test {
         let t_final = 10.0;
 
         let solver = BDF6::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -806,6 +858,7 @@ mod test {
         let t_final = 2.0;
 
         let solver = BDF6::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -840,6 +893,7 @@ mod test {
         let t_final = 6.0;
 
         let solver = BDF6::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -874,6 +928,7 @@ mod test {
         let t_final = 7.0;
 
         let solver = BDF2::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -908,6 +963,7 @@ mod test {
         let t_final = 10.0;
 
         let solver = BDF2::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -942,6 +998,7 @@ mod test {
         let t_final = 1.0;
 
         let solver = BDF2::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -976,6 +1033,7 @@ mod test {
         let t_final = 6.0;
 
         let solver = BDF2::new()
+            .unwrap()
             .with_minimum_dt(1e-5)
             .unwrap()
             .with_maximum_dt(0.1)
