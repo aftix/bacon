@@ -373,6 +373,8 @@ where
             )? * self.dt;
 
             if i != 0 {
+                // Take a derivative with the non-cloned user data struct
+                (self.derivative)(self.time.real(), self.state.as_slice(), &mut self.data)?;
                 self.prev_values
                     .push_back((self.time.real(), self.state.clone()));
             }
@@ -576,6 +578,9 @@ where
 
         let higher_step = self.secant(&mut higher_func)?;
         let lower_step = self.secant(&mut lower_func)?;
+
+        // Take a derivative with the non-cloned user data struct
+        (self.derivative)(self.time.real(), self.state.as_slice(), &mut self.data)?;
 
         let difference = &higher_step - &lower_step;
         let error = difference.norm();

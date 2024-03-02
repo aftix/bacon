@@ -473,7 +473,7 @@ where
         self.implicit_derivs = (self.derivative)(
             self.time.real() + self.dt.real(),
             predictor.as_slice(),
-            &mut self.data.clone(),
+            &mut self.data,
         )?;
         self.scratch_pad = &self.implicit_derivs * self.corrector_coefficients[0];
 
