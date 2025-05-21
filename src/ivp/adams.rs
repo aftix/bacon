@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 
 /// This trait defines an Adams predictor-corrector solver
-/// The Adams struct takes an implemetation of this trait
+/// The [`Adams`] struct takes an implemetation of this trait
 /// as a type argument since the algorithm is the same for
 /// all the predictor correctors, just the order and these functions
 /// need to be different.
@@ -602,7 +602,7 @@ impl<N: ComplexField> AdamsCoefficients<5> for AdamsCoefficients5<N> {
 /// 5th order Adams predictor-corrector method for solving an IVP.
 ///
 /// Defines the predictor and corrector coefficients, as well as
-/// the error coefficient. Uses Adams for the actual solving.
+/// the error coefficient. Uses [`Adams`] for the actual solving.
 ///
 /// # Examples
 /// ```
@@ -661,7 +661,7 @@ impl<N: ComplexField + Copy> AdamsCoefficients<3> for AdamsCoefficients3<N> {
 /// 3rd order Adams predictor-corrector method for solving an IVP.
 ///
 /// Defines the predictor and corrector coefficients, as well as
-/// the error coefficient. Uses Adams for the actual solving.
+/// the error coefficient. Uses [`Adams`] for the actual solving.
 ///
 /// # Examples
 /// ```

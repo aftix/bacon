@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::marker::PhantomData;
 
 /// This trait defines an BDF solver
-/// The BDF struct takes an implemetation of this trait
+/// The [`BDF`] struct takes an implemetation of this trait
 /// as a type argument since the algorithm is the same for
 /// all the orders, just the constants are different.
 pub trait BDFCoefficients<const O: usize> {
@@ -68,7 +68,7 @@ where
 /// The solver for any BDF predictor-corrector
 /// Users should not use this type directly, and should
 /// instead get it from a specific BDF method struct
-/// (wrapped in an IVPIterator)
+/// (wrapped in an [`IVPIterator`])
 pub struct BDFSolver<'a, N, D, const O: usize, T, F>
 where
     D: Dimension,
@@ -676,7 +676,7 @@ impl<N: ComplexField> BDFCoefficients<7> for BDF6Coefficients<N> {
 /// solving an initial value problem.
 ///
 /// Defines the higher and lower order coefficients. Uses
-/// BDFInfo for the actual solving.
+/// [`BDFInfo`] for the actual solving.
 ///
 /// # Examples
 /// ```
@@ -733,7 +733,7 @@ impl<N: ComplexField> BDFCoefficients<3> for BDF2Coefficients<N> {
 /// solving an initial value problem.
 ///
 /// Defines the higher and lower order coefficients. Uses
-/// BDFInfo for the actual solving.
+/// [`BDFInfo`] for the actual solving.
 ///
 /// # Examples
 /// ```

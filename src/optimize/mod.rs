@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, One, Zero};
 /// Returns an error if the linear fit fails. (`xs.len() != ys.len()`)
 ///
 /// # Panics
-/// Panics if a `usize` can not be transformed into the generic type.
+/// Panics if a [`usize`] cannot be transformed into the generic type.
 pub fn linear_fit<N>(xs: &[N], ys: &[N]) -> Result<Polynomial<N>, String>
 where
     N: ComplexField + FromPrimitive + Copy,
@@ -244,7 +244,7 @@ where
 /// Fit a curve using the Levenberg-Marquardt algorithm.
 ///
 /// Uses finite differences of h to calculate the jacobian. If jacobian
-/// can be found analytically, then use `curve_fit_jac`. Keeps iterating until
+/// can be found analytically, then use [`curve_fit_jac`]. Keeps iterating until
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol.
 ///
@@ -390,7 +390,7 @@ where
 /// Returns an error if curve fit fails.
 ///
 /// # Panics
-/// Panics if a u8 can not be converted to the generic type.
+/// Panics if a [`u8`] can not be converted to the generic type.
 pub fn curve_fit_jac<N, F, G, const V: usize>(
     mut f: F,
     xs: &[N],
