@@ -87,7 +87,7 @@ where
         self.coefficients.len() - 1
     }
 
-    /// Returns the coefficients in the correct order to recreate the polynomial with Polynomial::from_slice(data: &[N]);
+    /// Returns the coefficients in the correct order to recreate the polynomial with [`Polynomial::from_slice`]
     pub fn get_coefficients(&self) -> Vec<N> {
         let mut cln = self.coefficients.clone();
         cln.reverse();

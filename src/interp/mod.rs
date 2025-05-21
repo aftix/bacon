@@ -13,7 +13,7 @@ pub use spline::*;
 
 /// Create a Lagrange interpolating polynomial.
 ///
-/// Create an nth degree polynomial matching the n points (xs[i], ys[i])
+/// Create an nth degree polynomial matching the n points (xs\[i\], ys\[i\])
 /// using Neville's iterated method for Lagrange polynomials. The result will
 /// match no derivatives.
 ///

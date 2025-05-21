@@ -61,7 +61,7 @@ where
 /// `xs` x points. Must be real because cubic splines keep track of ranges within
 /// which it interpolates. Must be sorted.
 ///
-/// `ys` y points. Can be complex. ys[i] must match with xs[i].
+/// `ys` y points. Can be complex. ys\[i\] must match with xs\[i\].
 ///
 /// `tol` the tolerance of the polynomials
 ///
@@ -178,7 +178,7 @@ where
 /// `xs` x points. Must be real because cubic splines keep track of ranges within
 /// which it interpolates. Must be sorted.
 ///
-/// `ys` y points. Can be complex. ys[i] must match with xs[i].
+/// `ys` y points. Can be complex. ys\[i\] must match with xs\[i\].
 ///
 /// `(f_0, f_n)` The derivative values at the end points.
 ///
