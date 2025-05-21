@@ -70,8 +70,8 @@ where
 
 /// The solver for any Runge-Kutta method
 /// Users should not use this type directly, and should
-/// instead get it from a specific RungeKutta struct
-/// (wrapped in an IVPIterator)
+/// instead get it from a specific [`RungeKutta`] struct
+/// (wrapped in an [`IVPIterator`])
 pub struct RungeKuttaSolver<'a, N, D, const O: usize, T, F>
 where
     D: Dimension,
@@ -95,7 +95,7 @@ where
     dt: N,
     state: BVector<N, D>,
 
-    // Per-order constants set by RungeKuttaCoefficients
+    // Per-order constants set by [`RungeKuttaCoefficients`]
     t_coefficients: BSVector<N, O>,
     k_coefficients: BSMatrix<N, O, O>,
     avg_coefficients: BSVector<N, O>,
@@ -528,7 +528,7 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
 /// Runge-Kutta-Fehlberg method for solving an IVP.
 ///
 /// Defines the Butcher Tableaux for a 5(4) order adaptive
-/// runge-kutta method. Uses [`RungeKutta`] to do the actual solving.
+/// Runge-Kutta method. Uses [`RungeKutta`] to do the actual solving.
 /// Provides an implementation of the [`IVPSolver`] trait.
 ///
 /// # Examples

@@ -14,8 +14,8 @@ pub mod adams;
 pub mod bdf;
 pub mod rk;
 
-/// Status returned from the IVPStepper
-/// Used by the IVPIterator struct to correctly step through
+/// Status returned from the [`IVPStepper`]
+/// Used by the [`IVPIterator`] struct to correctly step through
 /// the IVP solution.
 #[derive(Error, Clone, Debug)]
 pub enum IVPStatus<T: Error> {
@@ -90,14 +90,14 @@ impl From<DimensionError> for IVPError {
     }
 }
 
-/// A type alias for a Result of a IVPStepper step
+/// A type alias for a Result of a [`IVPStepper`] step
 /// Ok is a tuple of the time and solution at that time
 /// Err is an IVPError
 pub type Step<R, C, D, E> = Result<(R, BVector<C, D>), IVPStatus<E>>;
 
 /// Implementing this trait is providing the main functionality of
 /// an initial value problem solver. This should be used only when
-/// implementing an IVPSolver, users should use the solver via the IVPSolver
+/// implementing an [`IVPSolver`], users should use the solver via the [`IVPSolver`]
 /// trait's interface.
 pub trait IVPStepper<D: Dimension>: Sized
 where
@@ -128,7 +128,7 @@ where
 /// Build up the solver using the parameter builder functions and then use solve.
 ///
 /// This is used as a builder pattern, setting parameters of the solver.
-/// IVPSolver implementations should implement a step function that
+/// [`IVPSolver`] implementations should implement a step function that
 /// returns an IVPStatus, then a blanket impl will allow it to be used as an
 /// IntoIterator for the user to iterate over the results.
 pub trait IVPSolver<'a, D: Dimension>: Sized
@@ -284,7 +284,7 @@ where
 }
 
 /// The struct that actually solves an IVP with Euler's method
-/// Is the associated IVPStepper for Euler (the IVPSolver)
+/// Is the associated [`IVPStepper`] for Euler (the IVPSolver)
 /// You should use Euler and not this type directly
 pub struct EulerSolver<'a, N, D, T, F>
 where

@@ -5,7 +5,7 @@ use num_traits::{FromPrimitive, One, Zero};
 use std::collections::VecDeque;
 use std::{any::TypeId, f64, iter::FromIterator, ops};
 
-/// Polynomial on a ComplexField.
+/// Polynomial on a [`ComplexField`].
 #[derive(Debug, Clone)]
 pub struct Polynomial<N: ComplexField + FromPrimitive + Copy>
 where
