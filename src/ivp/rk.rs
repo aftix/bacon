@@ -13,7 +13,7 @@ use num_traits::{FromPrimitive, One, Zero};
 use std::marker::PhantomData;
 
 /// This trait defines a Runge-Kutta solver
-/// The RungeKutta struct takes an implemetation of this trait
+/// The [`RungeKutta`] struct takes an implementation of this trait
 /// as a type argument since the algorithm is the same for
 /// all the methods, just the order and these functions
 /// need to be different.
@@ -21,25 +21,25 @@ pub trait RungeKuttaCoefficients<const O: usize> {
     /// The real field associated with the solver's Field.
     type RealField: RealField;
 
-    /// Returns a vec of coeffecients to multiply the time step by when getting
-    /// intermediate results. Upper-left portion of Butch Tableaux
+    /// Returns a vec of coefficients to multiply the time step by when getting
+    /// intermediate results. Upper-left portion of Butcher Tableaux
     fn t_coefficients() -> Option<BSVector<Self::RealField, O>>;
 
     /// Returns the coefficients to use on the k_i's when finding another
-    /// k_i. Upper-right portion of the Butch Tableax. Should be
+    /// k_i. Upper-right portion of the Butcher Tableaux. Should be
     /// an NxN-1 matrix, where N is the order of the Runge-Kutta Method (Or order+1 for
     /// adaptive methods)
     fn k_coefficients() -> Option<BSMatrix<Self::RealField, O, O>>;
 
     /// Coefficients to use when calculating the final step to take.
     /// These are the weights of the weighted average of k_i's. Bottom
-    /// portion of the Butch Tableaux. For adaptive methods, this is the first
+    /// portion of the Butcher Tableaux. For adaptive methods, this is the first
     /// row of the bottom portion.
     fn avg_coefficients() -> Option<BSVector<Self::RealField, O>>;
 
     /// Coefficients to use on
     /// the k_i's to find the error between the two orders
-    /// of Runge-Kutta methods. In the Butch Tableaux, this is
+    /// of Runge-Kutta methods. In the Butcher Tableaux, this is
     /// the first row of the bottom portion minus the second row.
     fn error_coefficients() -> Option<BSVector<Self::RealField, O>>;
 }
@@ -192,7 +192,7 @@ where
     }
 
     /// Will overwrite any previously set value
-    /// If the provided minimum is greatear than a previously set maximum, then the maximum
+    /// If the provided minimum is greater than a previously set maximum, then the maximum
     /// is set to this value as well.
     fn with_minimum_dt(mut self, min: Self::RealField) -> Result<Self, Self::Error> {
         if min <= <Self::RealField as Zero>::zero() {
@@ -527,9 +527,9 @@ impl<N: ComplexField> RungeKuttaCoefficients<6> for RKCoefficients45<N> {
 
 /// Runge-Kutta-Fehlberg method for solving an IVP.
 ///
-/// Defines the Butch Tableaux for a 5(4) order adaptive
-/// runge-kutta method. Uses RungeKutta to do the actual solving.
-/// Provides an implementation of the IVPSolver trait.
+/// Defines the Butcher Tableaux for a 5(4) order adaptive
+/// runge-kutta method. Uses [`RungeKutta`] to do the actual solving.
+/// Provides an implementation of the [`IVPSolver`] trait.
 ///
 /// # Examples
 /// ```
@@ -622,9 +622,9 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
 
 /// Bogacki-Shampine method for solving an IVP.
 ///
-/// Defines the Butch Tableaux for a 5(4) order adaptive
-/// runge-kutta method. Uses RungeKutta to do the actual solving.
-/// Provides an implementation of the IVPSolver trait.
+/// Defines the Butcher Tableaux for a 5(4) order adaptive
+/// Runge-Kutta method. Uses [`RungeKutta`] to do the actual solving.
+/// Provides an implementation of the [`IVPSolver`] trait.
 ///
 /// # Examples
 /// ```
