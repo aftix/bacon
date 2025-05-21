@@ -384,7 +384,7 @@ where
 /// Uses an analytic jacobian.Keeps iterating until
 /// the differences between the sum of the square residuals of two iterations
 /// is under tol. Jacobian should be a function that returns a column vector
-/// where jacobian[i] is the partial derivative of f with respect to param[i].
+/// where jacobian\[i\] is the partial derivative of f with respect to param\[i\].
 ///
 /// # Errors
 /// Returns an error if curve fit fails.
