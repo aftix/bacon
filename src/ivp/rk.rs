@@ -622,7 +622,7 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
 
 /// Bogacki-Shampine method for solving an IVP.
 ///
-/// Defines the Butcher Tableaux for a 5(4) order adaptive
+/// Defines the Butcher Tableaux for a 3(2) order adaptive
 /// Runge-Kutta method. Uses [`RungeKutta`] to do the actual solving.
 /// Provides an implementation of the [`IVPSolver`] trait.
 ///
