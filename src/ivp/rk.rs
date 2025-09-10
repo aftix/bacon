@@ -659,6 +659,7 @@ pub type RungeKutta23<'a, N, D, T, F> = RungeKutta<'a, N, D, 4, T, F, RK23Coeffi
 mod test {
     use super::*;
     use crate::{ivp::UserError, BSVector};
+    use rstest::rstest;
 
     fn quadratic_deriv(t: f64, _y: &[f64], _: &mut ()) -> Result<BSVector<f64, 1>, UserError> {
         Ok(BSVector::from_column_slice(&[-2.0 * t]))
@@ -668,13 +669,27 @@ mod test {
         Ok(BSVector::from_column_slice(&[t.cos()]))
     }
 
-    #[test]
-    fn rungekutta45_quadratic() {
+    type TestRK<'a, const O: usize, R> = RungeKutta<
+        'a,
+        f64,
+        Const<1>,
+        O,
+        (),
+        fn(f64, &[f64], &mut ()) -> Result<BVector<f64, Const<1>>, UserError>,
+        R,
+    >;
+
+    #[rstest]
+    #[case::rk23(RungeKutta23::new().unwrap())]
+    #[case::rk45(RungeKutta45::new().unwrap())]
+    fn rungekutta_quadratic<'a, const O: usize, R>(#[case] rk: TestRK<'a, O, R>)
+    where
+        R: RungeKuttaCoefficients<O, RealField = f64>,
+    {
         let t_initial = 0.0;
         let t_final = 10.0;
 
-        let solver = RungeKutta45::new()
-            .unwrap()
+        let solver = rk
             .with_minimum_dt(0.0001)
             .unwrap()
             .with_maximum_dt(0.1)
@@ -703,83 +718,17 @@ mod test {
         }
     }
 
-    #[test]
-    fn rungekutta45_sine() {
+    #[rstest]
+    #[case::rk23(RungeKutta23::new().unwrap())]
+    #[case::rk45(RungeKutta45::new().unwrap())]
+    fn rungekutta_sine<'a, const O: usize, R>(#[case] rk: TestRK<'a, O, R>)
+    where
+        R: RungeKuttaCoefficients<O, RealField = f64>,
+    {
         let t_initial = 0.0;
         let t_final = 10.0;
 
-        let solver = RungeKutta45::new()
-            .unwrap()
-            .with_minimum_dt(0.001)
-            .unwrap()
-            .with_maximum_dt(0.01)
-            .unwrap()
-            .with_tolerance(0.0001)
-            .unwrap()
-            .with_initial_time(t_initial)
-            .unwrap()
-            .with_ending_time(t_final)
-            .unwrap()
-            .with_initial_conditions_slice(&[0.0])
-            .unwrap()
-            .with_derivative(sine_deriv)
-            .solve(())
-            .unwrap();
-
-        let path = solver.collect_vec().unwrap();
-
-        for step in &path {
-            assert!(approx_eq!(
-                f64,
-                step.1.column(0)[0],
-                step.0.sin(),
-                epsilon = 0.01
-            ));
-        }
-    }
-
-    #[test]
-    fn rungekutta23_quadratic() {
-        let t_initial = 0.0;
-        let t_final = 10.0;
-
-        let solver = RungeKutta23::new()
-            .unwrap()
-            .with_minimum_dt(0.0001)
-            .unwrap()
-            .with_maximum_dt(0.1)
-            .unwrap()
-            .with_initial_time(t_initial)
-            .unwrap()
-            .with_ending_time(t_final)
-            .unwrap()
-            .with_tolerance(1e-5)
-            .unwrap()
-            .with_initial_conditions_slice(&[1.0])
-            .unwrap()
-            .with_derivative(quadratic_deriv)
-            .solve(())
-            .unwrap();
-
-        let path = solver.collect_vec().unwrap();
-
-        for step in &path {
-            assert!(approx_eq!(
-                f64,
-                step.1.column(0)[0],
-                1.0 - step.0.powi(2),
-                epsilon = 0.0001
-            ));
-        }
-    }
-
-    #[test]
-    fn rungekutta23_sine() {
-        let t_initial = 0.0;
-        let t_final = 10.0;
-
-        let solver = RungeKutta23::new()
-            .unwrap()
+        let solver = rk
             .with_minimum_dt(0.001)
             .unwrap()
             .with_maximum_dt(0.01)
