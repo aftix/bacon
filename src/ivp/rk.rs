@@ -615,7 +615,7 @@ impl<N: ComplexField> RungeKuttaCoefficients<4> for RK23Coefficients<N> {
             -Self::RealField::from_u8(5)? / Self::RealField::from_u8(72)?,
             Self::RealField::from_u8(12)?.recip(),
             Self::RealField::from_u8(9)?.recip(),
-            Self::RealField::from_u8(8)?.recip(),
+            -Self::RealField::from_u8(8)?.recip(),
         ]))
     }
 }
@@ -709,6 +709,76 @@ mod test {
         let t_final = 10.0;
 
         let solver = RungeKutta45::new()
+            .unwrap()
+            .with_minimum_dt(0.001)
+            .unwrap()
+            .with_maximum_dt(0.01)
+            .unwrap()
+            .with_tolerance(0.0001)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_initial_conditions_slice(&[0.0])
+            .unwrap()
+            .with_derivative(sine_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                step.0.sin(),
+                epsilon = 0.01
+            ));
+        }
+    }
+
+    #[test]
+    fn rungekutta23_quadratic() {
+        let t_initial = 0.0;
+        let t_final = 10.0;
+
+        let solver = RungeKutta23::new()
+            .unwrap()
+            .with_minimum_dt(0.0001)
+            .unwrap()
+            .with_maximum_dt(0.1)
+            .unwrap()
+            .with_initial_time(t_initial)
+            .unwrap()
+            .with_ending_time(t_final)
+            .unwrap()
+            .with_tolerance(1e-5)
+            .unwrap()
+            .with_initial_conditions_slice(&[1.0])
+            .unwrap()
+            .with_derivative(quadratic_deriv)
+            .solve(())
+            .unwrap();
+
+        let path = solver.collect_vec().unwrap();
+
+        for step in &path {
+            assert!(approx_eq!(
+                f64,
+                step.1.column(0)[0],
+                1.0 - step.0.powi(2),
+                epsilon = 0.0001
+            ));
+        }
+    }
+
+    #[test]
+    fn rungekutta23_sine() {
+        let t_initial = 0.0;
+        let t_final = 10.0;
+
+        let solver = RungeKutta23::new()
             .unwrap()
             .with_minimum_dt(0.001)
             .unwrap()
